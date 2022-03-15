@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<meta 
+  xmlns="http://exist-db.org/xquery/repo">
+  <description>Search Fringe Tracking Targets</description>
+  <author>JMMC Tech Group</author>
+  <website>https://www.jmmc.fr</website>
+  <status>alpha</status>
+  <license>AGPL-3.0</license>
+  <copyright>true</copyright>
+  <type>application</type>
+  <target>searchftt</target>
+  <prepare>pre-install.xql</prepare>
+  <finish>post-install.xql</finish>
+  <changelog>
+     <change version="1.0.0">
+      <ul xmlns=""> 
+        <li>First public release.</li>
+      </ul>
+    </change>
+  </changelog>
+</meta>
