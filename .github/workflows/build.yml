@@ -1,0 +1,27 @@
+name: CI
+
+# Controls when the workflow will run
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+  - cron: "13 01 * * *"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+      
+      - run: npm update
+      - run: ant
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: build
+          path: build
+
