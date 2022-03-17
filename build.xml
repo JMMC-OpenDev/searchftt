@@ -14,7 +14,9 @@
     <copy file="node_modules/bootstrap/dist/js/bootstrap.bundle.min.js.map" todir="resources/scripts" />
     <copy file="node_modules/bootstrap/dist/css/bootstrap.min.css" todir="resources/css" />
     <copy file="node_modules/bootstrap/dist/css/bootstrap.min.css.map" todir="resources/css" />
-    <copy file="node_modules/bootstrap-icons/bootstrap-icons.svg" todir="resources/css" />
+    <copy todir="resources/css/bootstrap-icons/font">
+      <fileset dir="node_modules/bootstrap-icons/font" />
+    </copy>
   </target>
   <!-- Dev build (includes everything unoptimized) -->
   <target name="dev" depends="init" description="compile all source files">
