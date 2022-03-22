@@ -189,6 +189,7 @@ declare function app:search-esagaia($id, $max, $s) {
                                 }</tr>
                         }
                     </table>
+                    <code class="extcols d-none"><br/>{$query}</code>
                 </div>
                 else
                     <div>
@@ -235,6 +236,7 @@ declare function app:search-gdr2ap($id, $max, $s) {
                         }
                     </table>
                     <a target="_new" href="{$html-form-url}">View original votable @ GAVO</a>&#160;({serialize($votable//*:COOSYS)})
+                    <code class="extcols d-none"><br/>{$query}</code>
                 </div>
                 else
                     <div>
