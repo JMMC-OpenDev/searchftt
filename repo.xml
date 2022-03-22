@@ -12,6 +12,11 @@
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
   <changelog>
+    <change version="1.0.3">
+      <ul xmlns=""> 
+        <li>Add GAIA DR2 query querying ESA's archive.</li>
+      </ul>
+    </change>
     <change version="1.0.2">
       <ul xmlns=""> 
         <li>Add missing bootstrap-icon font.</li>
