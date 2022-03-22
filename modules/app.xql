@@ -36,17 +36,17 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
         <p>This newborn tool is in its first version and is subject to various changes in its early development phase.</p>
         <h2>Underlying method:</h2>
       <p>
-      This form queries within {$max_dist_as}" of the science target : <br/>
+      It consists in querying within {$max_dist_as}" of the science target : <br/>
         <ol>
             <li>Simbad for sources that are suitable for GRAVITY-wide fringe tracking (i.e. ( Kmag &lt; {$max_magK} and Vmag &lt; {$max_magV} ) or Rmag&lt;{$max_magR})</li>
-            <li><a href="https://gea.esac.esa.int/archive/">GAIA DR2 @ ESA</a> with it's <a href="https://arxiv.org/pdf/1808.09151.pdf"> Cross-match with external catalogues</a>.</li>
+            <li><a href="https://gea.esac.esa.int/archive/">GAIA DR2 @ ESA catalogues</a> with it's <a href="https://arxiv.org/pdf/1808.09151.pdf"> Cross-match with external catalogues</a>.</li>
             <li>the catalog <a href = "https://ui.adsabs.harvard.edu/abs/2022arXiv220103252F/abstract">Astrophysical Parameters from Gaia DR2, 2MASS &amp; AllWISE</a> through the GAVO TAP service in search for sources that are suitable for GRAVITY-wide fringe tracking (i.e. mag_ks &lt; {$max_magK} and computed_mag_v&lt;{$max_magV}). The V and R magnitudes are computed from the Gaia G, Grb and Grp magnitudes and allows the user to refine its target selection to take into account VLTI Adaptive Optics specifications (recall P110: UT (MACAO): Vmag&lt;{$max_magV}, AT (NAOMI): Rmag&lt;{$max_magR}).</li>
         </ol>
     </p>
     <p>
         <ul>
-            <li>Target name resolution relies on <a href="http://simbad.u-strasbg.fr">Simbad</a>.</li>
-            <li>Send your target to Aspro2 using <a href="https://www.jmmc.fr/getstar">GetStar</a> links in the result tables then press "Send Votable".</li>
+            <li>You can query one or several Science Targets. Enter their name, the resolution of which is relied on <a href="http://simbad.u-strasbg.fr">Simbad</a>, in the Text Box below.</li>
+            <li>To send a target to <a href="https://www.jmmc.fr/getstar">Aspro2</a> (already open), click on the icon in the <a href="https://www.jmmc.fr/getstar">GetStar</a> column, then press "Send Votable".</li>
             <li>Please <a href="http://www.jmmc.fr/feedback">fill a report</a> for any question or remark.</li>
         </ul>
     </p>
