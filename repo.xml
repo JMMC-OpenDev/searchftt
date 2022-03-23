@@ -11,19 +11,31 @@
   <target>searchftt</target>
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
-  <changelog>
+  <changelog xmlns="">
+    <change version="1.0.5">
+      <ul> 
+        <li>Add Kmag limit for AT cases in addition to previous Rmag (the tool now has two internal max_magK_UT and max_magK_AT parameters).</li>
+      </ul>
+    </change>
+    <change version="1.0.4">
+      <ul> 
+        <li>Main change in the layout.</li>
+        <li>Add the version number in the navbar.</li>
+        <li>Add the about page with release notes.</li>
+      </ul>
+    </change>
     <change version="1.0.3">
-      <ul xmlns=""> 
+      <ul> 
         <li>Add GAIA DR2 query querying ESA's archive.</li>
       </ul>
     </change>
     <change version="1.0.2">
-      <ul xmlns=""> 
+      <ul> 
         <li>Add missing bootstrap-icon font.</li>
       </ul>
     </change>
     <change version="1.0.0">
-      <ul xmlns=""> 
+      <ul> 
         <li>First public release.</li>
       </ul>
     </change>

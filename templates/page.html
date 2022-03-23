@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
     <head>
-        <title data-template="config:app-title">searchftt</title>
+        <title data-template="config:app-title">App Title</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
         <meta data-template="config:app-meta"/>
         <link rel="shortcut icon" href="resources/images/exist_icon_16x16.ico"/>
@@ -11,22 +11,65 @@
         <script type="text/javascript" src="resources/scripts/bootstrap.bundle.min.js"/>
         <script type="text/javascript" src="resources/scripts/jquery.min.js"/>
     </head>
-    <body id="body">
+    <body id="body" data-template="jmmc-about:changelog">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+            <div class="container-fluid">
+                <a class="navbar-brand" data-template="jmmc-web:navbar-li">JMMC</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavDarkDropdown" aria-controls="navbarNavDarkDropdown" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"/>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNavDarkDropdown">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDarkDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                SearchFTT
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navbarDarkDropdownMenuLink">
+                                <li>
+                                    <a class="dropdown-item" href="index.html"> <i class="bi bi-house"/> Home page</a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="about.html"> <i class="bi bi-info-circle"/> About</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="index.html">
+                                <i class="bi bi-house"/> Home</a> 
+                        </li>
+                    </ul>
+                    <span class="navbar-text">
+                        V.<span data-template="jmmc-about:version"/>
+                    </span>
+                </div>
+             
+            </div>
+        </nav>
         <div class="container-fluid">
             <div class="row">
                 <div id="content" class="col-md-12"/>
             </div>
         </div>
-        <footer>
         
-            <div class="poweredby">
+        <footer>
+             <div class="poweredby">
                 <a href="http://exist-db.org">
                     <img src="resources/images/powered-by.svg" alt="Powered by eXist-db"/>
                 </a>
                 <a href="https://www.jmmc.fr">
                     <img src="https://www.jmmc.fr/IMG/siteon0.png?1568820294" alt="Powered by JMMC"/>
                 </a>
+                <a href="http://simbad.cds.unistra.fr/simbad/">
+                    <img src="https://cds.u-strasbg.fr/img/simbad_small.png"/>
+                </a>
+                <a href="https://gea.esac.esa.int/archive/">
+                <img src="https://www.cosmos.esa.int/documents/29201/29222/Gaia+Archive+logo.png/167275a5-9577-4d20-b0e0-a97625a73e0b"/>
+                </a>
+                <a href="https://dc.zah.uni-heidelberg.de/">
+                <img src="https://dc.zah.uni-heidelberg.de/static/img/logo_medium.png"/>
+                </a>
+                
             </div>
-        </footer>
+        </footer>            
     </body>
 </html>

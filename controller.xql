@@ -30,6 +30,9 @@ if ($exist:path eq '') then
     <dispatch xmlns="http://exist.sourceforge.net/NS/exist">
         <view>
           <forward url="{$exist:controller}/modules/view.xql"/>
+          <set-header name="Cache-Control" value="no-cache, no-store, must-revalidate"/>
+          <set-header name="Pragma" value="no-cache"/>
+          <set-header name="Expires" value="0"/>
         </view>
         <error-handler>
       	  <forward url="{$exist:controller}/error-page.html" method="get"/>
@@ -41,3 +44,4 @@ if ($exist:path eq '') then
           <dispatch xmlns="http://exist.sourceforge.net/NS/exist">
               <cache-control cache="yes"/>
           </dispatch>
+

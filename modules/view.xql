@@ -9,6 +9,9 @@ xquery version "3.1";
 
 import module namespace templates="http://exist-db.org/xquery/html-templating";
 import module namespace lib="http://exist-db.org/xquery/html-templating/lib";
+import module namespace jmmc-about="http://exist.jmmc.fr/jmmc-resources/about";
+import module namespace jmmc-web="http://exist.jmmc.fr/jmmc-resources/web";
+
 
 (:
  : The following modules provide functions which will be called by the

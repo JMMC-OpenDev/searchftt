@@ -19,7 +19,8 @@ import module namespace jmmc-simbad="http://exist.jmmc.fr/jmmc-resources/simbad"
 
 (: Constants :)
 declare variable $app:default_max_magV := 15;
-declare variable $app:default_max_magK := 11;
+declare variable $app:default_max_magK_UT := 11;
+declare variable $app:default_max_magK_AT := 10;
 declare variable $app:default_max_magR := 12.5;
 declare variable $app:default_max_dist_as := 30; 
 
@@ -27,7 +28,8 @@ declare variable $app:default_max_dist_as := 30;
 declare %templates:wrap function app:form($node as node(), $model as map(*), $identifiers as xs:string*) {
     let $max_dist_as := request:get-parameter("max_dist_as", $app:default_max_dist_as)
     let $max_magV := request:get-parameter("max_magV", $app:default_max_magV)
-    let $max_magK := request:get-parameter("max_magK", $app:default_max_magK) 
+    let $max_magK_UT := request:get-parameter("max_magK_UT", $app:default_max_magK_UT)
+    let $max_magK_AT := request:get-parameter("max_magK_AT", $app:default_max_magK_AT) 
     let $max_magR := request:get-parameter("max_magR", $app:default_max_magR) 
     return 
     (
@@ -36,24 +38,30 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
         <p>This newborn tool is in its first version and is subject to various changes in its early development phase.</p>
         <h2>Underlying method:</h2>
       <p>
-      It consists in querying within {$max_dist_as}" of the science target : <br/>
+      You can query one or several Science Targets. For each of them, three results of Fringe Tracker Targets will be given using following research methods: <br/>
         <ol>
-            <li>Simbad for sources that are suitable for GRAVITY-wide fringe tracking (i.e. ( Kmag &lt; {$max_magK} and Vmag &lt; {$max_magV} ) or Rmag&lt;{$max_magR})</li>
-            <li><a href="https://gea.esac.esa.int/archive/">GAIA DR2 @ ESA catalogues</a> with it's <a href="https://arxiv.org/pdf/1808.09151.pdf"> Cross-match with external catalogues</a>.</li>
-            <li>the catalog <a href = "https://ui.adsabs.harvard.edu/abs/2022arXiv220103252F/abstract">Astrophysical Parameters from Gaia DR2, 2MASS &amp; AllWISE</a> through the GAVO TAP service in search for sources that are suitable for GRAVITY-wide fringe tracking (i.e. mag_ks &lt; {$max_magK} and computed_mag_v&lt;{$max_magV}). The V and R magnitudes are computed from the Gaia G, Grb and Grp magnitudes and allows the user to refine its target selection to take into account VLTI Adaptive Optics specifications (recall P110: UT (MACAO): Vmag&lt;{$max_magV}, AT (NAOMI): Rmag&lt;{$max_magR}).</li>
+            <li>Simbad for sources that are suitable for  fringe tracking.</li>
+            <li>GAIA DR2 catalogues <a href="https://arxiv.org/pdf/1808.09151.pdf">with its external catalogues cross-match</a> though <a href="https://gea.esac.esa.int/archive/">ESA archive center</a>.</li>
+            <li>The <a href = "https://ui.adsabs.harvard.edu/abs/2022arXiv220103252F/abstract">Astrophysical Parameters from Gaia DR2, 2MASS &amp; AllWISE</a>  catalog through the GAVO DC.</li>
         </ol>
+        
+        Each query is performed within {$max_dist_as}" of the Science Target. A magnitude filter is applied on every Fringe Tracker Targets according to the best limits offered in P110  for <b>UT (MACAO) OR AT (NAOMI)</b>  respectively <b>( K &lt; {$max_magK_UT} AND V &lt; {$max_magV} ) OR ( K &lt; {$max_magK_AT} AND R&lt;{$max_magR} )</b>. When missing, the V and R magnitudes are computed from the Gaia G, Grb and Grp magnitudes. The user must <b>refine its target selection</b> to take into account <a href="https://www.eso.org/sci/facilities/paranal/instruments/gravity/inst.html">VLTI Adaptive Optics specifications</a> before we offer a configuration selector in a future release. 
+        
     </p>
+    
+    
     <p>
         <ul>
-            <li>You can query one or several Science Targets. Enter their name, the resolution of which is relied on <a href="http://simbad.u-strasbg.fr">Simbad</a>, in the Text Box below.</li>
+            <li>Enter  name, the resolution of which is relied on <a href="http://simbad.u-strasbg.fr">Simbad</a>, in the Text Box below.</li>
             <li>To send a target to <a href="https://www.jmmc.fr/getstar">Aspro2</a> (already open), click on the icon in the <a href="https://www.jmmc.fr/getstar">GetStar</a> column, then press "Send Votable".</li>
             <li>Please <a href="http://www.jmmc.fr/feedback">fill a report</a> for any question or remark.</li>
         </ul>
     </p>
     <form>
-        <div class="form-floating">
-            <input class="form-control" type="text" id="identifiers" name="identifiers" value="{$identifiers}" required=""/>
-            <label for="identifiers">Find Fringe Tracker Targets for your identifiers (comma separated) </label>
+        <div class="p-3 input-group mb-3 ">
+            <input type="text" class="form-control" placeholder="Science identifiers (comma separated)" aria-label="Science identifiers (comma separated)" aria-describedby="b2"
+            id="identifiers" name="identifiers" value="{$identifiers}" required=""/>
+            <button class="btn btn-outline-secondary" type="submit" id="b2"><i class="bi bi-search"/></button>
         </div>
     </form>
     
@@ -73,26 +81,29 @@ declare function app:searchftt-list($identifiers as xs:string) {
         let $info := if(exists($s/ra))then 
             let $max := 25
                 return 
-                    <ol>
-                        <li>{app:search-simbad($id, $max, $s)}</li>
-                        <li>{app:search-esagaia($id, $max, $s)}</li>
-                        <li>{app:search-gdr2ap($id, $max, $s)}</li>
+                    <ol class="list-group list-group-numbered">
+                    {
+                        for $e in ( app:search-simbad($id, $max, $s), app:search-esagaia($id, $max, $s), app:search-gdr2ap($id, $max, $s) )
+                            return <li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto">{$e}</div></li>
+                    }
                     </ol>
             else
                 <div>Can't get position from Simbad, please check your identifier.</div>
         let $state := if(exists($info//table)) then "success" else if(exists($s/ra)) then "warning" else "danger"
         let $ff :=()
         return 
+            <ul class="p-1 list-group">
             <li class="list-group-item d-flex justify-content-between align-items-start list-group-item-{$state}">
                 <div class="ms-2 me-auto">
                   <div class="fw-bold"><a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}">{$id} &#160;-&#160; {$ra}&#160;{$dec}</a></div>
                   { $info }
                 </div>
             </li>
+            </ul>
     return
-        <ul class="list-group">
-            {$lis,
-            (<li class="list-group-item d-flex justify-content-between align-items-start">
+        
+            ($lis,
+            (<ul class="p-1 list-group"><li class="list-group-item d-flex justify-content-between align-items-start">
                 <div class="ms-2 me-auto">
                   <div class="form-check form-switch">
                       <label class="form-check-label extcols">Show more information</label>
@@ -100,9 +111,9 @@ declare function app:searchftt-list($identifiers as xs:string) {
                       <input class="form-check-input" type="checkbox" onClick='$(".extcols").toggleClass("d-none");'/>
                   </div>
                 </div>
-            </li>)[true() or $lis//table]
-            }
-        </ul>
+            </li></ul>)[true() or $lis//table]
+            )
+        
         
         (: todo add aladin light with H-2MASS :)
 };
@@ -164,6 +175,7 @@ declare function app:search-esagaia($id, $max, $s) {
                         <thead><tr><th>Simbad link</th>
                             {for $f at $cpos in $votable//*:FIELD where $cpos != 1
                                 let $name := if(starts-with($f/@name, "computed_")) then replace($f/@name, "computed_", "") else data($f/@name)
+                                let $name :=  replace($name, "j_2mass", "2MASS&#160;J")
                                 let $unit :=if (ends-with($f/@name, "_as")) then "[arcsec]" else if(starts-with($f/@name, "computed_")) then "(computed)" else if (data($f/@unit)) then "["|| $f/@unit ||"]" else ()
                                 
                                 return 
@@ -254,11 +266,12 @@ declare function app:searchftt-simbad-query($identifier, $max){
 
     let $max_dist_as := request:get-parameter("max_dist_as", $app:default_max_dist_as)
     let $max_magV := request:get-parameter("max_magV", $app:default_max_magV)
-    let $max_magK := request:get-parameter("max_magK", $app:default_max_magK) 
+    let $max_magK_UT := request:get-parameter("max_magK_UT", $app:default_max_magK_UT)
+    let $max_magK_AT := request:get-parameter("max_magK_AT", $app:default_max_magK_AT)
     let $max_magR := request:get-parameter("max_magR", $app:default_max_magR)  
 
     
-    let $max-mag-filters := <text>( K&lt;{$max_magK} AND V&lt;{$max_magV} ) OR R&lt;{$max_magR} </text>
+    let $max-mag-filters := <text>( K&lt;{$max_magK_UT} AND V&lt;{$max_magV} ) OR ( K&lt;{$max_magK_AT} AND R&lt;{$max_magR})</text>
     
     let $query := concat("SELECT  DISTINCT main_id, DISTANCE(POINT('ICRS', ra, dec),POINT('ICRS', ", $ra,",",$dec,"))*3600.0 as dist_as, ra, dec, pmra,pmdec, G, K, V, R, otype_txt FROM basic JOIN allfluxes ON oid=oidref JOIN ident USING(oidref) WHERE ( ",$max-mag-filters, " ) AND CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', ", $ra, ", ", $dec, ",", $samestar-dist_as,")) = 0 AND CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', ", $ra, ", ", $dec, ",", $max_dist_as,"/3600.0)) = 1 ORDER BY dist_as;")
     return
@@ -272,7 +285,8 @@ declare function app:searchftt-query($identifier, $max){
     
     let $max_dist_as := request:get-parameter("max_dist_as", $app:default_max_dist_as)
     let $max_magV := request:get-parameter("max_magV", $app:default_max_magV)
-    let $max_magK := request:get-parameter("max_magK", $app:default_max_magK) 
+    let $max_magK_UT := request:get-parameter("max_magK_UT", $app:default_max_magK_UT)
+    let $max_magK_AT := request:get-parameter("max_magK_AT", $app:default_max_magK_AT)
     let $max_magR := request:get-parameter("max_magR", $app:default_max_magR) 
     
     let $detail := "pmra, pmdec, (-15.5*pmra/1000.0) as delta_ra2000_as,(-15.5*pmdec/1000.0) as delta_de2000_as,(RA-15.5*pmra/3600000.0) as RA2000,(DEC-15.5*pmdec/3600000.0) AS de2000,"
@@ -285,7 +299,7 @@ declare function app:searchftt-query($identifier, $max){
     let $vcalc := <text>( {$mag_g_name} - ( -0.0176 - 0.00686* ({$mag_bp_name} - {$mag_rp_name} ) - 0.1732*( {$mag_bp_name} - {$mag_rp_name})*( {$mag_bp_name} - {$mag_rp_name}) ) )</text>
     let $rcalc := <text>( {$mag_g_name} - ( 0.003226 + 0.3833* ({$mag_bp_name} - {$mag_rp_name} ) - 0.1345*( {$mag_bp_name} - {$mag_rp_name})*( {$mag_bp_name} - {$mag_rp_name}) ) )</text>
     
-    let $max-mag-filters := <text>({$mag_k_name}&lt;{$max_magK} AND {$vcalc}&lt;{$max_magV}) OR {$rcalc}&lt;{$max_magR}</text>
+    let $max-mag-filters := <text>({$mag_k_name}&lt;{$max_magK_UT} AND {$vcalc}&lt;{$max_magV}) OR ({$mag_k_name}&lt;{$max_magK_AT} AND {$rcalc}&lt;{$max_magR})</text>
     
     let $query := concat("SELECT gaia.dr2light.source_id,DISTANCE(POINT('ICRS',(RA-15.5*pmra/3600000.0),(DEC-15.5*pmdec/3600000.0)),POINT('ICRS', ", $ra,",",$dec,"))*3600.0 as dist_as ,ra,dec,", $detail,"mag_g,mag_ks,",$vcalc, " AS computed_mag_v, ",$rcalc, " AS computed_mag_r ", "&#10; FROM gaia.dr2light JOIN gdr2ap.main ON gaia.dr2light.source_id=gdr2ap.main.source_id WHERE (", $max-mag-filters, ") AND CONTAINS(POINT('ICRS', RA, DEC), CIRCLE('ICRS', ", $ra,",",$dec,", ",$max_dist_as,"/3600.0)) = 1 " ) 
     (: ivo_apply_pm(RA,DEC,pmra,pmdec,-15) does not seems to work :)
@@ -301,7 +315,8 @@ declare function app:searchftt-esagaia-query($identifier, $max){
     
     let $max_dist_as := request:get-parameter("max_dist_as", $app:default_max_dist_as)
     let $max_magV := request:get-parameter("max_magV", $app:default_max_magV)
-    let $max_magK := request:get-parameter("max_magK", $app:default_max_magK) 
+    let $max_magK_UT := request:get-parameter("max_magK_UT", $app:default_max_magK_UT)
+    let $max_magK_AT := request:get-parameter("max_magK_AT", $app:default_max_magK_AT) 
     let $max_magR := request:get-parameter("max_magR", $app:default_max_magR) 
     
     let $mag_k_name := "tmass.ks_m"
@@ -311,7 +326,7 @@ declare function app:searchftt-esagaia-query($identifier, $max){
     let $vcalc := <text>( {$mag_g_name} - ( -0.0176 - 0.00686* ({$mag_bp_name} - {$mag_rp_name} ) - 0.1732*( {$mag_bp_name} - {$mag_rp_name})*( {$mag_bp_name} - {$mag_rp_name}) ) )</text>
     let $rcalc := <text>( {$mag_g_name} - ( 0.003226 + 0.3833* ({$mag_bp_name} - {$mag_rp_name} ) - 0.1345*( {$mag_bp_name} - {$mag_rp_name})*( {$mag_bp_name} - {$mag_rp_name}) ) )</text>
     
-    let $max-mag-filters := <text>({$mag_k_name}&lt;{$max_magK} AND {$vcalc}&lt;{$max_magV}) OR {$rcalc}&lt;{$max_magR}</text>
+    let $max-mag-filters := <text>({$mag_k_name}&lt;{$max_magK_UT} AND {$vcalc}&lt;{$max_magV}) OR ({$mag_k_name}&lt;{$max_magK_AT} AND {$rcalc}&lt;{$max_magR})</text>
     
     let $query := string-join((
     "SELECT",
@@ -326,3 +341,4 @@ declare function app:searchftt-esagaia-query($identifier, $max){
     return
         $query
 };
+
