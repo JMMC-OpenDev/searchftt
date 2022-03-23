@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<div xmlns="http://www.w3.org/1999/xhtml" data-template="templates:surround" data-template-with="templates/page.html" data-template-at="content">
+    <ul>
+        <li>
+            <a href="#credits">Credits</a>
+        </li>
+        <li>
+            <a href="#changelog">Change Log</a>
+        </li>
+    </ul>
+    <hr/>
+    <h2>
+        <a name="credits"/>Credits</h2>
+    <p>
+        <ul>
+            <li>
+            Please check links and logs in this page's header. 
+            </li>
+            <li>
+            Thank you to the <em>wide</em> <a href="https://ivoa.net">Virtual Observatory</a>. 
+            </li>
+        </ul>
+    </p>
+    <div data-template="jmmc-about:changelog">
+        <h2>
+            <a name="changelog"/>Change Log (current version: <span data-template="jmmc-about:version"/> / deployed on <span data-template="jmmc-about:deployed"/>)</h2>
+        <div data-template="templates:each" data-template-from="changes" data-template-to="change">
+            <div>
+                <hr/>
+                <div>
+                    <b>Version <span data-template="jmmc-about:change-version"/>
+                    </b>
+                </div>
+                <div data-template="jmmc-about:change"/>
+            </div>
+        </div>
+    </div>
+</div>
