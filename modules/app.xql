@@ -73,6 +73,10 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
 };
 
 declare function app:searchftt-list($identifiers as xs:string) {
+    let $max_dist_as := request:get-parameter("max_dist_as", $app:default_max_dist_as)
+    let $fov_deg := 3 * $max_dist_as div 3600
+
+    
     let $ids := $identifiers ! tokenize(., ",") ! tokenize(., ";")
     let $lis :=
         for $id at $pos in $ids 
@@ -92,17 +96,31 @@ declare function app:searchftt-list($identifiers as xs:string) {
         let $state := if(exists($info//table)) then "success" else if(exists($s/ra)) then "warning" else "danger"
         let $ff :=()
         return 
-            <ul class="p-1 list-group">
-            <li class="list-group-item d-flex justify-content-between align-items-start list-group-item-{$state}">
-                <div class="ms-2 me-auto">
-                  <div class="fw-bold"><a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}">{$id} &#160;-&#160; {$ra}&#160;{$dec}</a></div>
-                  { $info }
-                </div>
-            </li>
-            </ul>
+            <div><ul class="p-1 list-group">
+                <li class="list-group-item list-group-item-{$state}">
+                    <div class="">
+                        <div class="row">
+                            <div class="col"><a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}">{$id} &#160;-&#160; {$ra}&#160;{$dec}</a></div>
+                            <div class="col d-flex flex-row-reverse">
+                                <div id="aladin-lite-div{$pos}" style="width:200px;height:200px;"></div>
+                                { if (exists($s/ra)) then 
+                                    <script type="text/javascript">
+                                        var aladin = A.aladin('#aladin-lite-div{$pos}', {{survey: "P/2MASS/color", fov:{$fov_deg}, target:"{$id}" }});
+                                    </script>
+                                    else ()
+                                }
+                            </div>
+                        </div>
+                        <div class="row">
+                            { $info }
+                        </div>
+                    </div>
+                </li>
+            </ul></div>
     return
         
-            ($lis,
+            (<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>,
+             $lis,
             (<ul class="p-1 list-group"><li class="list-group-item d-flex justify-content-between align-items-start">
                 <div class="ms-2 me-auto">
                   <div class="form-check form-switch">
@@ -113,9 +131,6 @@ declare function app:searchftt-list($identifiers as xs:string) {
                 </div>
             </li></ul>)[true() or $lis//table]
             )
-        
-        
-        (: todo add aladin light with H-2MASS :)
 };
 
 declare function app:search-simbad($id, $max, $s) {

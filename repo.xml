@@ -12,6 +12,11 @@
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
   <changelog xmlns="">
+     <change version="1.1.0">
+      <ul> 
+        <li>Add AladinLite centered on the Science Star with fov of 3 * max-dist using 2MASS/H image server (used by guiding cam).</li>
+      </ul>
+    </change>
     <change version="1.0.5">
       <ul> 
         <li>Add Kmag limit for AT cases in addition to previous Rmag (the tool now has two internal max_magK_UT and max_magK_AT parameters).</li>
