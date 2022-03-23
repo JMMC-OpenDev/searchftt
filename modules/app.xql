@@ -105,7 +105,7 @@ declare function app:searchftt-list($identifiers as xs:string) {
                                 <div id="aladin-lite-div{$pos}" style="width:200px;height:200px;"></div>
                                 { if (exists($s/ra)) then 
                                     <script type="text/javascript">
-                                        var aladin = A.aladin('#aladin-lite-div{$pos}', {{survey: "P/2MASS/color", fov:{$fov_deg}, target:"{$id}" }});
+                                        var aladin = A.aladin('#aladin-lite-div{$pos}', {{survey: "P/2MASS/H", fov:{$fov_deg}, target:"{$id}" }});
                                     </script>
                                     else ()
                                 }
