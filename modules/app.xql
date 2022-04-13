@@ -101,15 +101,15 @@ declare function app:searchftt-list($identifiers as xs:string) {
                     <div class="">
                         <div class="row">
                             <div class="col"><a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}">{$id} &#160;-&#160; {$ra}&#160;{$dec}</a></div>
-                            <div class="col d-flex flex-row-reverse">
-                                <div id="aladin-lite-div{$pos}" style="width:200px;height:200px;"></div>
                                 { if (exists($s/ra)) then 
-                                    <script type="text/javascript">
-                                        var aladin = A.aladin('#aladin-lite-div{$pos}', {{survey: "P/2MASS/H", fov:{$fov_deg}, target:"{$id}" }});
-                                    </script>
+                                    <div class="col d-flex flex-row-reverse">
+                                        <div id="aladin-lite-div{$pos}" style="width:200px;height:200px;"></div>
+                                        <script type="text/javascript">
+                                            var aladin = A.aladin('#aladin-lite-div{$pos}', {{survey: "P/2MASS/H", fov:{$fov_deg}, target:"{$id}" }});
+                                        </script>
+                                    </div>
                                     else ()
                                 }
-                            </div>
                         </div>
                         <div class="row">
                             { $info }
