@@ -12,6 +12,17 @@
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
   <changelog xmlns="">
+     <change version="1.1.2">
+      <ul> 
+        <li>Handle targets selection by coordinates when name resolution is not possible.</li>
+        <li>Add <i class="bi bi-github"/> github repo link to the about page.</li>
+      </ul>
+    </change>
+     <change version="1.1.1">
+      <ul> 
+        <li>Add JMMC favicon.</li>
+      </ul>
+    </change>
      <change version="1.1.0">
       <ul> 
         <li>Add AladinLite centered on the Science Star with fov of 3 * max-dist using 2MASS/H image server (used by guiding cam).</li>
@@ -31,7 +42,7 @@
     </change>
     <change version="1.0.3">
       <ul> 
-        <li>Add GAIA DR2 query querying ESA's archive.</li>
+        <li><b>Add GAIA DR2 query querying ESA's archive.</b></li>
       </ul>
     </change>
     <change version="1.0.2">

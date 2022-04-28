@@ -40,7 +40,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
       <p>
       You can query one or several Science Targets. For each of them, three results of Fringe Tracker Targets will be given using following research methods: <br/>
         <ol>
-            <li>Simbad for sources that are suitable for  fringe tracking.</li>
+            <li>Simbad for sources that are suitable for fringe tracking.</li>
             <li>GAIA DR2 catalogues <a href="https://arxiv.org/pdf/1808.09151.pdf">with its external catalogues cross-match</a> though <a href="https://gea.esac.esa.int/archive/">ESA archive center</a>.</li>
             <li>The <a href = "https://ui.adsabs.harvard.edu/abs/2022arXiv220103252F/abstract">Astrophysical Parameters from Gaia DR2, 2MASS &amp; AllWISE</a>  catalog through the GAVO DC.</li>
         </ol>
@@ -52,7 +52,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
     
     <p>
         <ul>
-            <li>Enter  name, the resolution of which is relied on <a href="http://simbad.u-strasbg.fr">Simbad</a>, in the Text Box below.</li>
+            <li>Enter comma separated names ( resolved by <a href="http://simbad.u-strasbg.fr">Simbad</a>) or coordinates (RA +/-DEC in degrees), in the TextBox below.</li>
             <li>To send a target to <a href="https://www.jmmc.fr/getstar">Aspro2</a> (already open), click on the icon in the <a href="https://www.jmmc.fr/getstar">GetStar</a> column, then press "Send Votable".</li>
             <li>Please <a href="http://www.jmmc.fr/feedback">fill a report</a> for any question or remark.</li>
         </ul>
@@ -72,15 +72,25 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
     )
 };
 
+
+declare function app:resolve-by-name($name-or-coords) {
+    if (matches($name-or-coords, "[a-z]", "i"))
+    then
+        jmmc-simbad:resolve-by-name($name-or-coords)
+    else 
+        let $coord := $name-or-coords => replace( "\+", " +") => replace ("\-", " -")
+        let $t := for $e in tokenize($coord, " ")[string-length(.)>0]  return $e
+        return <s><name>{normalize-space($name-or-coords)}</name><ra>{$t[1]}</ra><dec>{$t[2]}</dec></s>
+};
+
 declare function app:searchftt-list($identifiers as xs:string) {
     let $max_dist_as := request:get-parameter("max_dist_as", $app:default_max_dist_as)
     let $fov_deg := 3 * $max_dist_as div 3600
-
     
     let $ids := $identifiers ! tokenize(., ",") ! tokenize(., ";")
     let $lis :=
         for $id at $pos in $ids 
-        let $s := jmmc-simbad:resolve-by-name($id)
+        let $s := app:resolve-by-name($id)
         let $ra := $s/ra let $dec := $s/dec
         let $info := if(exists($s/ra))then 
             let $max := 25
@@ -274,7 +284,7 @@ declare function app:search-gdr2ap($id, $max, $s) {
 
 
 declare function app:searchftt-simbad-query($identifier, $max){
-    let $s := jmmc-simbad:resolve-by-name($identifier) 
+    let $s := app:resolve-by-name($identifier) 
     let $ra := $s/ra
     let $dec := $s/dec
     let $samestar-dist_as := 1E-23
@@ -294,7 +304,7 @@ declare function app:searchftt-simbad-query($identifier, $max){
 };
 
 declare function app:searchftt-query($identifier, $max){
-    let $s := jmmc-simbad:resolve-by-name($identifier) 
+    let $s := app:resolve-by-name($identifier) 
     let $ra := $s/ra
     let $dec := $s/dec
     
@@ -324,7 +334,7 @@ declare function app:searchftt-query($identifier, $max){
 
 
 declare function app:searchftt-esagaia-query($identifier, $max){
-    let $s := jmmc-simbad:resolve-by-name($identifier) 
+    let $s := app:resolve-by-name($identifier) 
     let $ra := $s/ra
     let $dec := $s/dec
     
@@ -356,4 +366,5 @@ declare function app:searchftt-esagaia-query($identifier, $max){
     return
         $query
 };
+
 
