@@ -21,6 +21,7 @@ declare variable $app:json-conf :='{
     "catalogs":{
         "gdr2ap": {
             "cat_name":"tbd",
+            "description": "The <a href=&apos;https://ui.adsabs.harvard.edu/abs/2022arXiv220103252F/abstract&apos;>Astrophysical Parameters from Gaia DR2, 2MASS &amp;amp; AllWISE</a>  catalog through the GAVO DC.",
             "source_id":"gaia.dr2light.source_id",
             "ra"      :"gaia.dr2light.ra",
             "dec"     :"gaia.dr2light.dec",
@@ -36,6 +37,7 @@ declare variable $app:json-conf :='{
             "from"    : "gaia.dr2light JOIN gdr2ap.main ON gaia.dr2light.source_id=gdr2ap.main.source_id"
         },"esagaia": {
             "cat_name"    : "tbd",
+            "description" : "GAIA DR2 catalogues <a href=&apos;https://arxiv.org/pdf/1808.09151.pdf&apos;>with its external catalogues cross-match</a> though <a href=&apos;https://gea.esac.esa.int/archive/&apos;>ESA archive center</a>.",
             "source_id":"gaia.source_id",
             "ra"          : "gaia.ra",
             "dec"         : "gaia.dec",
@@ -91,8 +93,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
             You can query one or several Science Targets. For each of them, three results of Fringe Tracker Targets will be given using following research methods: <br/>
             <ol>
                 <li>Simbad for sources that are suitable for fringe tracking.</li>
-                <li>GAIA DR2 catalogues <a href="https://arxiv.org/pdf/1808.09151.pdf">with its external catalogues cross-match</a> though <a href="https://gea.esac.esa.int/archive/">ESA archive center</a>.</li>
-                <li>The <a href = "https://ui.adsabs.harvard.edu/abs/2022arXiv220103252F/abstract">Astrophysical Parameters from Gaia DR2, 2MASS &amp; AllWISE</a>  catalog through the GAVO DC.</li>
+                { for $desc in $app:conf?catalogs?*?description return <li>{parse-xml("<span>"||$desc||"</span>")}</li>}
             </ol>
             Each query is performed within {$max?dist_as}&apos; of the Science Target.
             A magnitude filter is applied on every Fringe Tracker Targets according to the best limits offered in P110
@@ -267,7 +268,7 @@ declare function app:searchftt-simbad-query($identifier, $max) as xs:string{
 
 
 declare function app:search-esagaia($id, $max, $s) {
-	let $query := app:searchftt-query($identifier, $max, "esagaia")
+	let $query := app:searchftt-query($id, $max, "esagaia")
 	let $tapserver := ()
 	let $votable := jmmc-tap:tap-adql-query("https://gea.esac.esa.int/tap-server/tap/sync", $query, $max?max_rec, "votable_plain")
     let $src := ()
@@ -275,7 +276,7 @@ declare function app:search-esagaia($id, $max, $s) {
 };
 
 declare function app:search-gdr2ap($id, $max, $s) {
-	let $query := app:searchftt-query($identifier, $max, "gdr2ap")
+	let $query := app:searchftt-query($id, $max, "gdr2ap")
 	let $tapserver := ""
 	let $votable := try { jmmc-tap:tap-adql-query('https://dc.zah.uni-heidelberg.de/tap/sync',$query, $max?max_rec) } catch * {()}
 
