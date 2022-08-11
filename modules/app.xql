@@ -22,6 +22,9 @@ declare variable $app:json-conf :='{
         "gdr2ap": {
             "cat_name":"tbd",
             "description": "The <a href=&apos;https://ui.adsabs.harvard.edu/abs/2022arXiv220103252F/abstract&apos;>Astrophysical Parameters from Gaia DR2, 2MASS &amp;amp; AllWISE</a>  catalog through the GAVO DC.",
+            "tap_endpoint": "https://dc.zah.uni-heidelberg.de/tap/sync",
+            "tap_format" : "",
+            "tap_viewer" : "http://dc.g-vo.org/__system__/adql/query/form?__nevow_form__=genForm&amp;_FORMAT=HTML&amp;submit=Go&amp;query=",
             "source_id":"gaia.dr2light.source_id",
             "ra"      :"gaia.dr2light.ra",
             "dec"     :"gaia.dr2light.dec",
@@ -38,6 +41,9 @@ declare variable $app:json-conf :='{
         },"esagaia": {
             "cat_name"    : "tbd",
             "description" : "GAIA DR2 catalogues <a href=&apos;https://arxiv.org/pdf/1808.09151.pdf&apos;>with its external catalogues cross-match</a> though <a href=&apos;https://gea.esac.esa.int/archive/&apos;>ESA archive center</a>.",
+            "tap_endpoint" : "https://gea.esac.esa.int/tap-server/tap/sync",
+            "tap_format" : "votable_plain",
+            "tap_viewer" : "",
             "source_id":"gaia.source_id",
             "ra"          : "gaia.ra",
             "dec"         : "gaia.dec",
@@ -94,6 +100,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
             <ol>
                 <li>Simbad for sources that are suitable for fringe tracking.</li>
                 { for $desc in $app:conf?catalogs?*?description return <li>{parse-xml("<span>"||$desc||"</span>")}</li>}
+
             </ol>
             Each query is performed within {$max?dist_as}&apos; of the Science Target.
             A magnitude filter is applied on every Fringe Tracker Targets according to the best limits offered in P110
@@ -152,8 +159,7 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
                 {
                     for $e in (
                         app:search-simbad($id, $max, $s),
-                        app:search-esagaia($id, $max, $s),
-                        app:search-gdr2ap($id, $max, $s)
+                        for $cat in $app:conf?catalogs?* return app:search($id, $max, $s, $cat)
                         )
                         return <li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto">{$e}</div></li>
                 }
@@ -266,27 +272,13 @@ declare function app:searchftt-simbad-query($identifier, $max) as xs:string{
         $query
 };
 
+declare function app:search($id, $max, $s, $cat) {
+	let $query := app:searchftt-query($id, $max, $cat)
+	let $votable := try { jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $max?max_rec, $cat?tap_format) } catch * {()}
+	let $src := if ($cat?tap_viewer)  then <a href="{$cat?tap_viewer||encode-for-uri($query)}"><br/>View original votable</a> else ()
 
-declare function app:search-esagaia($id, $max, $s) {
-	let $query := app:searchftt-query($id, $max, "esagaia")
-	let $tapserver := ()
-	let $votable := jmmc-tap:tap-adql-query("https://gea.esac.esa.int/tap-server/tap/sync", $query, $max?max_rec, "votable_plain")
-    let $src := ()
-    return app:search($votable, $src, $query, $s)
-};
+    return
 
-declare function app:search-gdr2ap($id, $max, $s) {
-	let $query := app:searchftt-query($id, $max, "gdr2ap")
-	let $tapserver := ""
-	let $votable := try { jmmc-tap:tap-adql-query('https://dc.zah.uni-heidelberg.de/tap/sync',$query, $max?max_rec) } catch * {()}
-
-    let $html-form-url := "http://dc.g-vo.org/__system__/adql/query/form?__nevow_form__=genForm&amp;query="||encode-for-uri($query)||"&amp;MAXREC="||$max?rec||"&amp;_FORMAT=HTML&amp;submit=Go"
-	let $src := <a href="{$html-form-url}"><br/>View original votable @ GAVO</a>
-
-    return app:search($votable, $src, $query, $s)
-};
-
-declare function app:search($votable, $src, $query, $s) {
     (: TODO hide columns that are in 'detail' map config :)
     if(exists($votable//*:TABLEDATA/*)) then
         let $extcols:=(-1)
@@ -331,13 +323,11 @@ declare function app:search($votable, $src, $query, $s) {
         </div>
 };
 
-declare function app:searchftt-query($identifier, $max, $catalog){
+declare function app:searchftt-query($identifier, $max, $cat as map(*)){
 
     let $s := app:resolve-by-name($identifier)
     let $ra := $s/ra
     let $dec := $s/dec
-
-    let $cat := $app:conf?catalogs?($catalog)
 
     let $vcalc := <text>( {$cat?mag_g } - ( -0.0176 - 0.00686* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1732*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
     let $rcalc := <text>( {$cat?mag_g } - ( 0.003226 + 0.3833* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1345*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
