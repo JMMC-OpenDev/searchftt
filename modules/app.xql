@@ -26,6 +26,7 @@ declare variable $app:json-conf :='{
         "max_dist_as" : 30,
         "max_rec" : 25
     },
+    "extended-cols" : [ "pmra", "pmdec", "epoch"],
     "catalogs":{
         "gdr2ap": {
             "cat_name":"GDR2AP",
@@ -45,7 +46,7 @@ declare variable $app:json-conf :='{
             "mag_g"   : "mag_g",
             "mag_bp"  : "mag_bp",
             "mag_rp"  : "mag_rp",
-            "detail"  : {"mag_ks":"mag_ks"},
+            "detail"  : { },
             "from"    : "gaia.dr2light JOIN gdr2ap.main ON gaia.dr2light.source_id=gdr2ap.main.source_id"
         },"esagaia3": {
             "cat_name"    : "GAIA DR3",
@@ -55,7 +56,7 @@ declare variable $app:json-conf :='{
             "tap_viewer"   : "",
             "simbad_prefix_id" : "GAIA DR3 ",
             "source_id"   :"gaia.source_id",
-            "epoch"   : 2015.5,
+            "epoch"   : 2016.0,
             "ra"          : "gaia.ra",
             "dec"         : "gaia.dec",
             "pmra"        : "gaia.pmra",
@@ -111,7 +112,7 @@ declare variable $app:json-conf :='{
             }
     }
 }';
-(: TODO add epoch (mandatory for GSC2) : could be a constant or a column name :)
+
 declare variable $app:conf := parse-json($app:json-conf);
 
 (:~
@@ -149,7 +150,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
             </ol>
             Each query is performed within {$max?dist_as}&apos; of the Science Target.
             A magnitude filter is applied on every Fringe Tracker Targets according to the best limits offered in P110
-            for <b>UT (MACAO) OR AT (NAOMI)</b>  respectively <b>( K &lt; {$max?magK_UT} AND V &lt; {$max?magV} ) OR ( K &lt; {$max?magK_AT} AND R&lt;{$max?magR} )</b>.
+            for <b>UT (MACAO) OR AT (NAOMI)</b>  respectively <b>( K &lt; {$max?magK_UT} AND V &lt; {$max?magV} ) https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=I/353OR ( K &lt; {$max?magK_AT} AND R&lt;{$max?magR} )</b>.
             When missing, the V and R magnitudes are computed from the Gaia G, Grb and Grp magnitudes.
             The user must <b>refine its target selection</b> to take into account <a href="https://www.eso.org/sci/facilities/paranal/instruments/gravity/inst.html">VLTI Adaptive Optics specifications</a> before we offer a configuration selector in a future release.
         </p>
@@ -195,15 +196,22 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
 
     let $ids := $identifiers ! tokenize(., ",") ! tokenize(., ";")
 
-    let $toggle-button := (<ul class="p-1 list-group"><li class="list-group-item d-flex justify-content-between align-items-start">
+    let $toggle-classes := map{
+        "extcols" : map{"on":"Show more columns", "off":"Show basic columns"},
+        "extquery" : map{"on":"Show queries", "off":"Hide queries"},
+        "extdebug" : map{"on":"Show debug", "off":"Hide debug"}
+    }
+    let $toggle-button := <ul class="p-1 list-group"><li class="list-group-item d-flex justify-content-between align-items-start">{ for $k in map:keys($toggle-classes)
+        return
                 <div class="ms-2 me-auto">
-                  <div class="form-check form-switch">
-                      <label class="form-check-label extcols">Show more information</label>
-                      <label class="form-check-label extcols d-none">Show basic information</label>
-                      <input class="form-check-input" type="checkbox" onClick='$(".extcols").toggleClass("d-none");'/>
-                  </div>
+                    <div class="form-check form-switch">
+                        <label class="form-check-label {$k}">{$toggle-classes($k)?on}</label>
+                        <label class="form-check-label {$k} d-none">{$toggle-classes($k)?off}</label>
+                        <input class="form-check-input" type="checkbox" onClick='$(".{$k}").toggleClass("d-none");'/>
+                    </div>
                 </div>
-            </li></ul>)
+        }
+        </li></ul>
 
     let $lis :=
         for $id at $pos in $ids
@@ -249,26 +257,28 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
             (<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>,
             $toggle-button[count($ids)>1], (: placed before on list :)
             $lis,
-            $toggle-button[count($ids)=1]  (: placed after on single target :)
+            $toggle-button[count($ids)>=1]  (: placed after on single target :)
             )
 };
 
 declare function app:search-simbad($id, $max, $s) {
 	let $query := app:searchftt-simbad-query($id,$max)
-    let $query-code := <pre class="extcols d-none"><br/>{data($query)}</pre>
+    let $query-code := <pre class="extquery d-none"><br/>{data($query)}</pre>
     let $votable := try{jmmc-tap:tap-adql-query($jmmc-tap:SIMBAD-SYNC, $query, $max?max_rec) } catch * {()}
     let $html-form-url := ""
     let $extcols := ( 1500 ) (: detailed cols (hidden by default) :)
     return
         if(exists($votable//*:TABLEDATA/*)) then
+        let $detail_cols := for $e in array:flatten($app:conf?extended-cols) return lower-case($e) (: values correspond to column names given by AS ...:)
+        let $field_names := for $e in $votable//*:FIELD/@name return lower-case($e)
+        return
         <div class="table-responsive">
-            <h3 class="extcols d-none">SIMBAD</h3>
             <table class="table">
                 <thead><tr><th>Simbad Name</th>
                     {for $f at $cpos in $votable//*:FIELD where $cpos != 1
                         let $unit :=if (ends-with($f/@name, "_as")) then "[arcsec]" else if (data($f/@unit)) then "["|| $f/@unit ||"]" else ()
                         return
-                        <th title="{$f/*:DESCRIPTION}">{if($cpos=$extcols) then attribute {"class"} {"d-none extcols"} else ()}{data($f/@name)} &#160; {$unit}</th>
+                        <th title="{$f/*:DESCRIPTION}">{if($field_names[$cpos]=$detail_cols) then attribute {"class"} {"d-none extcols table-light"} else ()}{data($f/@name)} &#160; {$unit}</th>
                     }
                     <th>GetStar</th>
                 </tr></thead>
@@ -283,7 +293,7 @@ declare function app:search-simbad($id, $max, $s) {
                                 (
                                     <td>{$target_link}</td>,
                                     for $td at $cpos in $tr/* where $cpos != 1 return
-                                        element {"td"} {attribute {"class"} {if($cpos=$extcols) then "d-none extcols" else ()}, try { let $d := xs:double($td) return format-number($d, "0.###") } catch * { data($td) }},
+                                        element {"td"} {attribute {"class"} {if( $field_names[$cpos]=$detail_cols ) then "d-none extcols table-light" else ()},try { let $d := xs:double($td) return format-number($d, "0.###") } catch * { if(string-length($td)>1) then data($td) else "-" }},
                                     <td>{$getstar-link}<!--{$getstar-votable//*:TABLEDATA/*:TR/*:TD[121]/text()}--></td>
                                 )
                         }</tr>
@@ -323,26 +333,25 @@ declare function app:searchftt-simbad-query($identifier, $max) as xs:string{
 
 declare function app:search($id, $max, $s, $cat) {
 	let $query := app:searchftt-query($id, $max, $cat)
-    let $query-code := <pre class="extcols d-none"><br/>{data($query)}</pre>
+    let $query-code := <pre class="extquery d-none"><br/>{data($query)}</pre>
 	let $votable := try { jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $max?max_rec, $cat?tap_format) } catch * {()}
-	let $src := if ($cat?tap_viewer)  then <a href="{$cat?tap_viewer||encode-for-uri($query)}"><br/>View original votable</a> else ()
+	let $src := if ($cat?tap_viewer)  then <a class="extquery d-none" href="{$cat?tap_viewer||encode-for-uri($query)}">View original votable</a> else ()
 
     return
 
-    (: TODO hide columns that are in 'detail' map config :)
     if(exists($votable//*:TABLEDATA/*)) then
-        let $extcols:=(-1)
+        let $detail_cols := for $e in (array:flatten($app:conf?extended-cols), $cat?detail?*) return lower-case($e) (: values correspond to column names given by AS ...:)
+        let $field_names := for $e in $votable//*:FIELD/@name return lower-case($e)
         return
         <div class="table-responsive">
-            <h3 class="extcols d-none">{$cat?cat_name}</h3>
             <table class="table">
-                <thead><tr><th>Simbad link</th>
+                <thead><tr><th>Simbad link for {$cat?cat_name}</th>
                     {for $f at $cpos in $votable//*:FIELD where $cpos != 1
                         let $name := if(starts-with($f/@name, "computed_")) then replace($f/@name, "computed_", "") else data($f/@name)
                         let $name :=  replace($name, "j_2mass", "2MASS&#160;J")
                         let $unit :=if (ends-with($f/@name, "_as")) then "[arcsec]" else if(starts-with($f/@name, "computed_")) then "(computed)" else if (data($f/@unit)) then "["|| $f/@unit ||"]" else ()
                         return
-                        <th title="{$f/*:DESCRIPTION}">{if($cpos=$extcols) then attribute {"class"} {"d-none extcols"} else ()}{$name} &#160; {$unit}</th>
+                        <th title="{$f/*:DESCRIPTION}">{if($field_names[$cpos]=$detail_cols) then attribute {"class"} {"d-none extcols table-light"} else ()}{$name} &#160; {$unit}</th>
                     }
                     <th>GetStar</th>
                 </tr></thead>
@@ -358,13 +367,13 @@ declare function app:search($id, $max, $s, $cat) {
                                 (
                                     <td>{$target_link}</td>,
                                     for $td at $cpos in $tr/* where $cpos != 1 return
-                                        element {"td"} {attribute {"class"} {if($cpos=$extcols) then "d-none extcols" else ()},try { format-number(number($td), "0.###") } catch * { data($td) }},
+                                        element {"td"} {attribute {"class"} {if( $field_names[$cpos]=$detail_cols ) then "d-none extcols table-light" else ()},try { let $d := xs:double($td) return format-number($d, "0.###") } catch * { if(string-length($td)>1) then data($td) else "-" }},
                                     <td>{$getstar-link}<!--{$getstar-votable//*:TABLEDATA/*:TR/*:TD[121]/text()}--></td>
                                 )
                         }</tr>
                 }
             </table>
-            <span class="extcols d-none">{serialize($votable//*:COOSYS[1]) } {$src} </span>{$query-code}
+            <span class="extdebug d-none">{serialize($votable//*:COOSYS[1])}</span> {$query-code} {$src}
         </div>
     else
         <div>
