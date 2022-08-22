@@ -28,7 +28,7 @@ declare variable $app:json-conf :='{
     },
     "catalogs":{
         "gdr2ap": {
-            "cat_name":"tbd",
+            "cat_name":"GDR2AP",
             "description": "The <a href=&apos;https://ui.adsabs.harvard.edu/abs/2022arXiv220103252F/abstract&apos;>Astrophysical Parameters from Gaia DR2, 2MASS &amp;amp; AllWISE</a>  catalog through the GAVO DC.",
             "tap_endpoint": "https://dc.zah.uni-heidelberg.de/tap/sync",
             "tap_format" : "",
@@ -40,15 +40,34 @@ declare variable $app:json-conf :='{
             "dec"     :"gaia.dr2light.dec",
             "pmra"    : "pmra",
             "pmdec"   : "pmdec",
-            "old_pos_others" : "pmra, pmdec, (-15.5*pmra/1000.0) as delta_ra2000_as, (-15.5*pmdec/1000.0) as delta_de2000_as, (ra-15.5*pmra/3600000.0) as RA2000, (dec-15.5*pmdec/3600000.0) as de2000",
+            "old_pos_others" : "(-15.5*pmra/1000.0) as delta_ra2000_as, (-15.5*pmdec/1000.0) as delta_de2000_as, (ra-15.5*pmra/3600000.0) as RA2000, (dec-15.5*pmdec/3600000.0) as de2000",
             "mag_k"   : "mag_ks",
             "mag_g"   : "mag_g",
             "mag_bp"  : "mag_bp",
             "mag_rp"  : "mag_rp",
             "detail"  : {"mag_ks":"mag_ks"},
             "from"    : "gaia.dr2light JOIN gdr2ap.main ON gaia.dr2light.source_id=gdr2ap.main.source_id"
+        },"esagaia3": {
+            "cat_name"    : "GAIA DR3",
+            "description" : "GAIA DR3 catalogues and cross-matched catalogues though <a href=&apos;https://gea.esac.esa.int/archive/&apos;>ESA archive center</a>.",
+            "tap_endpoint" : "https://gea.esac.esa.int/tap-server/tap/sync",
+            "tap_format"   : "votable_plain",
+            "tap_viewer"   : "",
+            "simbad_prefix_id" : "GAIA DR3 ",
+            "source_id"   :"gaia.source_id",
+            "epoch"   : 2015.5,
+            "ra"          : "gaia.ra",
+            "dec"         : "gaia.dec",
+            "pmra"        : "gaia.pmra",
+            "pmdec"       : "gaia.pmdec",
+            "mag_k"  : "tmass.ks_m",
+            "mag_g"  : "gaia.phot_g_mean_mag",
+            "mag_bp" : "gaia.phot_bp_mean_mag",
+            "mag_rp" : "gaia.phot_rp_mean_mag",
+            "detail"      : { "tmass.h_m":"H_mag", "tmass_nb.angular_distance":"tmass_dist", "tmass.designation":"J_2MASS" },
+            "from"        : "gaiadr3.gaia_source as gaia JOIN gaiaedr3.tmass_psc_xsc_best_neighbour AS tmass_nb USING (source_id) JOIN gaiaedr3.tmass_psc_xsc_join AS xjoin    ON tmass_nb.original_ext_source_id = xjoin.original_psc_source_id JOIN gaiadr1.tmass_original_valid AS tmass ON xjoin.original_psc_source_id = tmass.designation"
         },"esagaia2": {
-            "cat_name"    : "tbd",
+            "cat_name"    : "GAIA DR2",
             "description" : "GAIA DR2 catalogues <a href=&apos;https://arxiv.org/pdf/1808.09151.pdf&apos;>with its external catalogues cross-match</a> though <a href=&apos;https://gea.esac.esa.int/archive/&apos;>ESA archive center</a>.",
             "tap_endpoint" : "https://gea.esac.esa.int/tap-server/tap/sync",
             "tap_format"   : "votable_plain",
@@ -64,10 +83,10 @@ declare variable $app:json-conf :='{
             "mag_g"  : "gaia.phot_g_mean_mag",
             "mag_bp" : "gaia.phot_bp_mean_mag",
             "mag_rp" : "gaia.phot_rp_mean_mag",
-            "detail"      : { "tmass.h_m":"H_mag", "tmass.ks_m":"K_mag", "tmass_nb.angular_distance":"tmass_dist", "tmass.designation":"J_2MASS" },
-            "from"        : "gaiadr2.gaia_source as gaia JOIN gaiadr2.tmass_best_neighbour as tmass_nb ON gaia.source_id = tmass_nb.source_id JOIN gaiadr1.tmass_original_valid as tmass ON tmass.tmass_oid = tmass_nb.tmass_oid"
+            "detail"      : { "tmass.h_m":"H_mag", "tmass_nb.angular_distance":"tmass_dist", "tmass.designation":"J_2MASS" },
+            "from"        : "gaiadr2.gaia_source as gaia JOIN gaiadr2.tmass_best_neighbour as tmass_nb USING (source_id) JOIN gaiadr1.tmass_original_valid as tmass ON tmass.tmass_oid = tmass_nb.tmass_oid"
         },"gsc":    {
-            "cat_name"    : "gsc2",
+            "cat_name"    : "GSC2",
             "description" : "<a href=&apos;https://cdsarc.cds.unistra.fr/viz-bin/cat/I/353&apos;>The Guide Star Catalogue, Version 2.4.2 (2020)</a>",
             "tap_endpoint" : "http://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync",
             "tap_format"   : "",
@@ -176,6 +195,16 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
 
     let $ids := $identifiers ! tokenize(., ",") ! tokenize(., ";")
 
+    let $toggle-button := (<ul class="p-1 list-group"><li class="list-group-item d-flex justify-content-between align-items-start">
+                <div class="ms-2 me-auto">
+                  <div class="form-check form-switch">
+                      <label class="form-check-label extcols">Show more information</label>
+                      <label class="form-check-label extcols d-none">Show basic information</label>
+                      <input class="form-check-input" type="checkbox" onClick='$(".extcols").toggleClass("d-none");'/>
+                  </div>
+                </div>
+            </li></ul>)
+
     let $lis :=
         for $id at $pos in $ids
         let $s := app:resolve-by-name($id)
@@ -218,27 +247,22 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
             </ul></div>
     return
             (<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>,
-             $lis,
-            (<ul class="p-1 list-group"><li class="list-group-item d-flex justify-content-between align-items-start">
-                <div class="ms-2 me-auto">
-                  <div class="form-check form-switch">
-                      <label class="form-check-label extcols">Show more information</label>
-                      <label class="form-check-label extcols d-none">Show basic information</label>
-                      <input class="form-check-input" type="checkbox" onClick='$(".extcols").toggleClass("d-none");'/>
-                  </div>
-                </div>
-            </li></ul>)[true() or $lis//table]
+            $toggle-button[count($ids)>1], (: placed before on list :)
+            $lis,
+            $toggle-button[count($ids)=1]  (: placed after on single target :)
             )
 };
 
 declare function app:search-simbad($id, $max, $s) {
 	let $query := app:searchftt-simbad-query($id,$max)
+    let $query-code := <pre class="extcols d-none"><br/>{data($query)}</pre>
     let $votable := try{jmmc-tap:tap-adql-query($jmmc-tap:SIMBAD-SYNC, $query, $max?max_rec) } catch * {()}
     let $html-form-url := ""
     let $extcols := ( 1500 ) (: detailed cols (hidden by default) :)
     return
         if(exists($votable//*:TABLEDATA/*)) then
         <div class="table-responsive">
+            <h3 class="extcols d-none">SIMBAD</h3>
             <table class="table">
                 <thead><tr><th>Simbad Name</th>
                     {for $f at $cpos in $votable//*:FIELD where $cpos != 1
@@ -265,12 +289,11 @@ declare function app:search-simbad($id, $max, $s) {
                         }</tr>
                 }
             </table>
-            <code class="extcols d-none"><br/>{$query}</code>
+            {$query-code}
         </div>
         else
             <div>
-                Sorry, no fringe traking star found for <b>{$s/name/text()}</b> in <a href="{$html-form-url}">Simbad</a>
-                <code class="extcols d-none"><br/>{$query}</code>.
+                Sorry, no fringe traking star found for <b>{$s/name/text()}</b> in <a href="{$html-form-url}">Simbad</a>. {$query-code}
             </div>
 };
 
@@ -300,6 +323,7 @@ declare function app:searchftt-simbad-query($identifier, $max) as xs:string{
 
 declare function app:search($id, $max, $s, $cat) {
 	let $query := app:searchftt-query($id, $max, $cat)
+    let $query-code := <pre class="extcols d-none"><br/>{data($query)}</pre>
 	let $votable := try { jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $max?max_rec, $cat?tap_format) } catch * {()}
 	let $src := if ($cat?tap_viewer)  then <a href="{$cat?tap_viewer||encode-for-uri($query)}"><br/>View original votable</a> else ()
 
@@ -310,6 +334,7 @@ declare function app:search($id, $max, $s, $cat) {
         let $extcols:=(-1)
         return
         <div class="table-responsive">
+            <h3 class="extcols d-none">{$cat?cat_name}</h3>
             <table class="table">
                 <thead><tr><th>Simbad link</th>
                     {for $f at $cpos in $votable//*:FIELD where $cpos != 1
@@ -339,13 +364,11 @@ declare function app:search($id, $max, $s, $cat) {
                         }</tr>
                 }
             </table>
-            <span class="extcols d-none">{serialize($votable//*:COOSYS[1]) } {$src}</span>
-            <code class="extcols d-none"><br/>{$query}</code>
+            <span class="extcols d-none">{serialize($votable//*:COOSYS[1]) } {$src} </span>{$query-code}
         </div>
     else
         <div>
-            Sorry, no fringe traking star found for <b>{$s/name/text()}</b>.
-            <code class="extcols d-none"><br/>{$query}</code>
+            Sorry, no fringe traking star found for <b>{$s/name/text()} in {$cat?cat_name}</b>.{$query-code}
         </div>
 };
 
@@ -356,7 +379,7 @@ declare function app:searchftt-query($identifier, $max, $cat as map(*)){
     let $dec := $s/dec
 
     let $distance := if( $cat?pmra and $cat?pmdec and $cat?epoch ) then
-            <dist_as>DISTANCE( POINT('ICRS', {$cat?ra}-({$cat?epoch}-2000)*{$cat?pmra}/3600000.0, {$cat?dec}-({$cat?epoch}-2000)*{$cat?pmdec}/3600000.0 ), POINT('ICRS', {$ra},{$dec}))*3600.0 as dist_as</dist_as>
+            <dist_as>DISTANCE( POINT('ICRS', {$cat?ra}-(({$cat?epoch}-2000.0)*{$cat?pmra})/3600000.0, {$cat?dec}-(({$cat?epoch}-2000.0)*{$cat?pmdec})/3600000.0 ), POINT('ICRS', {$ra},{$dec}))*3600.0 as dist_as</dist_as>
         else
             <dist_as>DISTANCE( POINT('ICRS', {$cat?ra}, {$cat?dec}), POINT('ICRS', {$ra},{$dec}))*3600.0 as dist_as</dist_as>
 
