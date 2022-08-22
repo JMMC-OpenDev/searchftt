@@ -18,46 +18,6 @@ import module namespace jmmc-simbad="http://exist.jmmc.fr/jmmc-resources/simbad"
 
 (: Main config to unify catalog accross their colnames  :)
 declare variable $app:json-conf :='{
-    "catalogs":{
-        "gdr2ap": {
-            "cat_name":"tbd",
-            "description": "The <a href=&apos;https://ui.adsabs.harvard.edu/abs/2022arXiv220103252F/abstract&apos;>Astrophysical Parameters from Gaia DR2, 2MASS &amp;amp; AllWISE</a>  catalog through the GAVO DC.",
-            "tap_endpoint": "https://dc.zah.uni-heidelberg.de/tap/sync",
-            "tap_format" : "",
-            "tap_viewer" : "http://dc.g-vo.org/__system__/adql/query/form?__nevow_form__=genForm&amp;_FORMAT=HTML&amp;submit=Go&amp;query=",
-            "source_id":"gaia.dr2light.source_id",
-            "ra"      :"gaia.dr2light.ra",
-            "dec"     :"gaia.dr2light.dec",
-            "distance_ra" : "(ra-15.5*pmra/3600000.0)",
-            "distance_dec": "(dec-15.5*pmdec/3600000.0)",
-            "pos_others"  : "pmra, pmdec",
-            "old_pos_others" : "pmra, pmdec, (-15.5*pmra/1000.0) as delta_ra2000_as, (-15.5*pmdec/1000.0) as delta_de2000_as, (ra-15.5*pmra/3600000.0) as RA2000, (dec-15.5*pmdec/3600000.0) as de2000",
-            "mag_k"   : "mag_ks",
-            "mag_g"   : "mag_g",
-            "mag_bp"  : "mag_bp",
-            "mag_rp"  : "mag_rp",
-            "detail"  : {"mag_ks":"mag_ks"},
-            "from"    : "gaia.dr2light JOIN gdr2ap.main ON gaia.dr2light.source_id=gdr2ap.main.source_id"
-        },"esagaia": {
-            "cat_name"    : "tbd",
-            "description" : "GAIA DR2 catalogues <a href=&apos;https://arxiv.org/pdf/1808.09151.pdf&apos;>with its external catalogues cross-match</a> though <a href=&apos;https://gea.esac.esa.int/archive/&apos;>ESA archive center</a>.",
-            "tap_endpoint" : "https://gea.esac.esa.int/tap-server/tap/sync",
-            "tap_format" : "votable_plain",
-            "tap_viewer" : "",
-            "source_id":"gaia.source_id",
-            "ra"          : "gaia.ra",
-            "dec"         : "gaia.dec",
-            "distance_ra" : "gaia.ra",
-            "distance_dec": "gaia.dec",
-            "pos_others"  : "gaia.pmra, gaia.pmdec",
-            "mag_k"  : "tmass.ks_m",
-            "mag_g"  : "gaia.phot_g_mean_mag",
-            "mag_bp" : "gaia.phot_bp_mean_mag",
-            "mag_rp" : "gaia.phot_rp_mean_mag",
-            "detail"      : { "tmass.h_m":"H_mag", "tmass.ks_m":"K_mag", "tmass_nb.angular_distance":"tmass_dist", "tmass.designation":"J_2MASS" },
-            "from"        : "gaiadr2.gaia_source as gaia JOIN gaiadr2.tmass_best_neighbour as tmass_nb ON gaia.source_id = tmass_nb.source_id JOIN gaiadr1.tmass_original_valid as tmass ON tmass.tmass_oid = tmass_nb.tmass_oid"
-            }
-    },
     "default":{
         "max_magV" : 15,
         "max_magK_UT" : 11,
@@ -65,8 +25,74 @@ declare variable $app:json-conf :='{
         "max_magR" : 12.5,
         "max_dist_as" : 30,
         "max_rec" : 25
+    },
+    "catalogs":{
+        "gdr2ap": {
+            "cat_name":"tbd",
+            "description": "The <a href=&apos;https://ui.adsabs.harvard.edu/abs/2022arXiv220103252F/abstract&apos;>Astrophysical Parameters from Gaia DR2, 2MASS &amp;amp; AllWISE</a>  catalog through the GAVO DC.",
+            "tap_endpoint": "https://dc.zah.uni-heidelberg.de/tap/sync",
+            "tap_format" : "",
+            "tap_viewer" : "http://dc.g-vo.org/__system__/adql/query/form?__nevow_form__=genForm&amp;_FORMAT=HTML&amp;submit=Go&amp;query=",
+            "simbad_prefix_id" : "GAIA DR2 ",
+            "source_id":"gaia.dr2light.source_id",
+            "epoch"   : 2015.5,
+            "ra"      :"gaia.dr2light.ra",
+            "dec"     :"gaia.dr2light.dec",
+            "pmra"    : "pmra",
+            "pmdec"   : "pmdec",
+            "old_pos_others" : "pmra, pmdec, (-15.5*pmra/1000.0) as delta_ra2000_as, (-15.5*pmdec/1000.0) as delta_de2000_as, (ra-15.5*pmra/3600000.0) as RA2000, (dec-15.5*pmdec/3600000.0) as de2000",
+            "mag_k"   : "mag_ks",
+            "mag_g"   : "mag_g",
+            "mag_bp"  : "mag_bp",
+            "mag_rp"  : "mag_rp",
+            "detail"  : {"mag_ks":"mag_ks"},
+            "from"    : "gaia.dr2light JOIN gdr2ap.main ON gaia.dr2light.source_id=gdr2ap.main.source_id"
+        },"esagaia2": {
+            "cat_name"    : "tbd",
+            "description" : "GAIA DR2 catalogues <a href=&apos;https://arxiv.org/pdf/1808.09151.pdf&apos;>with its external catalogues cross-match</a> though <a href=&apos;https://gea.esac.esa.int/archive/&apos;>ESA archive center</a>.",
+            "tap_endpoint" : "https://gea.esac.esa.int/tap-server/tap/sync",
+            "tap_format"   : "votable_plain",
+            "tap_viewer"   : "",
+            "simbad_prefix_id" : "GAIA DR2 ",
+            "source_id"   :"gaia.source_id",
+            "epoch"   : 2015.5,
+            "ra"          : "gaia.ra",
+            "dec"         : "gaia.dec",
+            "pmra"        : "gaia.pmra",
+            "pmdec"       : "gaia.pmdec",
+            "mag_k"  : "tmass.ks_m",
+            "mag_g"  : "gaia.phot_g_mean_mag",
+            "mag_bp" : "gaia.phot_bp_mean_mag",
+            "mag_rp" : "gaia.phot_rp_mean_mag",
+            "detail"      : { "tmass.h_m":"H_mag", "tmass.ks_m":"K_mag", "tmass_nb.angular_distance":"tmass_dist", "tmass.designation":"J_2MASS" },
+            "from"        : "gaiadr2.gaia_source as gaia JOIN gaiadr2.tmass_best_neighbour as tmass_nb ON gaia.source_id = tmass_nb.source_id JOIN gaiadr1.tmass_original_valid as tmass ON tmass.tmass_oid = tmass_nb.tmass_oid"
+        },"gsc":    {
+            "cat_name"    : "gsc2",
+            "description" : "<a href=&apos;https://cdsarc.cds.unistra.fr/viz-bin/cat/I/353&apos;>The Guide Star Catalogue, Version 2.4.2 (2020)</a>",
+            "tap_endpoint" : "http://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync",
+            "tap_format"   : "",
+            "tap_viewer"   : "",
+            "simbad_prefix_id" : "",
+            "source_id"   :"GSC2",
+            "epoch"   : "Epoch",
+            "ra"          : "RA_ICRS",
+            "dec"         : "DE_ICRS",
+            "pmra"    : "pmRA",
+            "pmdec"   : "pmDE",
+            "pos_others"  : "pmRA, pmDE",
+            "mag_k"  : "Ksmag",
+            "mag_r" : "rmag",
+            "mag_g"  : "",
+            "mag_bp" : "",
+            "mag_rp" : "",
+            "mag_v"  : "Vmag",
+            "mag_r"  : "rmag",
+            "detail"      : { },
+            "from"        : "I/353/gsc242"
+            }
     }
 }';
+(: TODO add epoch (mandatory for GSC2) : could be a constant or a column name :)
 declare variable $app:conf := parse-json($app:json-conf);
 
 (:~
@@ -298,9 +324,9 @@ declare function app:search($id, $max, $s, $cat) {
                 {
                     for $tr in $votable//*:TABLEDATA/* return
                         <tr>{
-                            let $gdr2_id := "GAIA DR2 "||$tr/*[1] (: id alway must be requested as first param in the query :)
-                            let $simbad := jmmc-simbad:resolve-by-name($gdr2_id)
-                            let $target_link := if ($simbad/ra) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($gdr2_id)}">{replace($simbad/name," ","&#160;")}</a> else $gdr2_id
+                            let $simbad_id := $cat?simbad_prefix_id||$tr/*[1] (: id alway must be requested as first param in the query :)
+                            let $simbad := jmmc-simbad:resolve-by-name($simbad_id)
+                            let $target_link := if ($simbad/ra) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else $simbad_id
                             let $getstar-url := "https://apps.jmmc.fr/~sclws/getstar/sclwsGetStarProxy.php?star="||encode-for-uri($simbad/name)
                             let $getstar-link := if ($simbad/ra) then <a href="{$getstar-url}" target="{$simbad/name}"><i class="bi bi-box-arrow-up-right"></i></a>  else "-"
                             return
@@ -329,25 +355,40 @@ declare function app:searchftt-query($identifier, $max, $cat as map(*)){
     let $ra := $s/ra
     let $dec := $s/dec
 
-    let $vcalc := <text>( {$cat?mag_g } - ( -0.0176 - 0.00686* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1732*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
-    let $rcalc := <text>( {$cat?mag_g } - ( 0.003226 + 0.3833* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1345*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
+    let $distance := if( $cat?pmra and $cat?pmdec and $cat?epoch ) then
+            <dist_as>DISTANCE( POINT('ICRS', {$cat?ra}-({$cat?epoch}-2000)*{$cat?pmra}/3600000.0, {$cat?dec}-({$cat?epoch}-2000)*{$cat?pmdec}/3600000.0 ), POINT('ICRS', {$ra},{$dec}))*3600.0 as dist_as</dist_as>
+        else
+            <dist_as>DISTANCE( POINT('ICRS', {$cat?ra}, {$cat?dec}), POINT('ICRS', {$ra},{$dec}))*3600.0 as dist_as</dist_as>
 
-    let $max-mag-filters := <text>( ({$cat?mag_k }&lt;{$max?magK_UT} AND {$vcalc}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} AND {$rcalc}&lt;{$max?magR}) )</text>
-    let $detail := string-join(map:for-each( $cat?detail, function ($i, $j) { $i || ' AS ' ||$j}), ", ")
+    let $vmag := $cat?mag_v
+    let $rmag := $cat?mag_r
+    let $computed_prefix := if($vmag and $rmag ) then () else "computed_"
+
+    let $v_filter := if ($vmag) then $vmag else <text>( {$cat?mag_g } - ( -0.0176 - 0.00686* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1732*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
+    let $r_filter := if ($rmag) then $rmag else <text>( {$cat?mag_g } - ( 0.003226 + 0.3833* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1345*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
+    let $max-mag-filters := <text>( ({$cat?mag_k }&lt;{$max?magK_UT} AND {$v_filter}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} AND {$r_filter}&lt;{$max?magR}) )</text>
+
+    (: escape catalogs with / inside  (VizieR case):)
+    let $from := if(contains($cat?from, "/")) then '"'||$cat?from||'"' else $cat?from
+
+    let $mags := string-join((
+        <m>{$cat?mag_k} as mag_ks</m>
+        ,<m>{$cat?mag_g} as mag_g</m>[$cat?mag_g]
+        ,<m>{$v_filter} as {$computed_prefix}mag_v</m>
+        ,<m>{$r_filter} as {$computed_prefix}mag_r</m>
+        ,map:for-each( $cat?detail, function ($i, $j) { $i || ' AS ' ||$j})
+        ), ", ")
 
     let $query := <text>
     SELECT
         {$cat?source_id},
-        DISTANCE( POINT('ICRS', {$cat?distance_ra}, {$cat?distance_dec}), POINT('ICRS', {$ra},{$dec}))*3600.0 as dist_as,
+        {$distance},
         {$cat?ra}, {$cat?dec},
-        {$cat?pos_others},
-        {$cat?mag_k} as mag_ks,
-        {$cat?mag_g } as mag_g,
-        {$vcalc} as computed_mag_v,
-        {$rcalc} as computed_mag_r,
-        {$detail}
+        {$cat?pmra}, {$cat?pmdec},
+        {$cat?epoch} as epoch,
+        {$mags}
     FROM
-        {$cat?from}
+        {$from}
     WHERE
         {$max-mag-filters}
             AND
