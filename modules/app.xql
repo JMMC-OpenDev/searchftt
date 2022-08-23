@@ -140,9 +140,9 @@ declare function app:defaults() as map(*){
 declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*), $identifiers as xs:string*) {
     let $toggle-classes := map{ "extcols" : "extended columns", "extquery" : "queries", "extdebug" : "debug" }
     return
-        <li class="nav-link nav-orange">{
+        <li class="nav-link">{
             map:for-each( $toggle-classes, function ($k, $label) {
-                <div class="form-check form-check-inline form-switch">
+                <div class="form-check form-check-inline form-switch nav-orange">
                     <input class="form-check-input" type="checkbox" onClick='$(".{$k}").toggleClass("d-none");'/><label class="form-check-label">{$label}</label>
                 </div>
             })
