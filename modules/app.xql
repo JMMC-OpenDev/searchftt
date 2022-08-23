@@ -166,7 +166,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
             </ol>
             Each query is performed within {$max?dist_as}&apos; of the Science Target.
             A magnitude filter is applied on every Fringe Tracker Targets according to the best limits offered in P110
-            for <b>UT (MACAO) OR AT (NAOMI)</b>  respectively <b>( K &lt; {$max?magK_UT} AND V &lt; {$max?magV} ) https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=I/353OR ( K &lt; {$max?magK_AT} AND R&lt;{$max?magR} )</b>.
+            for <b>UT (MACAO) OR AT (NAOMI)</b>  respectively <b>( K &lt; {$max?magK_UT} AND V &lt; {$max?magV} ) OR ( K &lt; {$max?magK_AT} AND R&lt;{$max?magR} )</b>.
             When missing, the V and R magnitudes are computed from the Gaia G, Grb and Grp magnitudes.
             The user must <b>refine its target selection</b> to take into account <a href="https://www.eso.org/sci/facilities/paranal/instruments/gravity/inst.html">VLTI Adaptive Optics specifications</a> before we offer a configuration selector in a future release.
         </p>
