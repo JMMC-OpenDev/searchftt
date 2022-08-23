@@ -17,6 +17,18 @@
     <copy todir="resources/css/bootstrap-icons/font">
       <fileset dir="node_modules/bootstrap-icons/font" />
     </copy>
+
+    <copy file="node_modules/datatables.net/js/jquery.dataTables.min.js" todir="resources/scripts" />
+
+    <copy file="node_modules/datatables.net-bs5/css/dataTables.bootstrap5.min.css" todir="resources/css" />
+    <copy file="node_modules/datatables.net-bs5/js/dataTables.bootstrap5.min.js" todir="resources/scripts" />
+
+    <copy file="node_modules/datatables.net-bs5/images/sort_asc.png" todir="resources/images" />
+    <copy file="node_modules/datatables.net-bs5/images/sort_asc_disabled.png" todir="resources/images" />
+    <copy file="node_modules/datatables.net-bs5/images/sort_desc_disabled.png" todir="resources/images" />
+    <copy file="node_modules/datatables.net-bs5/images/sort_desc.png" todir="resources/images" />
+    <copy file="node_modules/datatables.net-bs5/images/sort_both.png" todir="resources/images" />
+
   </target>
   <!-- Dev build (includes everything unoptimized) -->
   <target name="dev" depends="init" description="compile all source files">

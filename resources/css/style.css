@@ -1,6 +1,6 @@
 /*Application styles could go here */
 footer .poweredby { float: right; margin: 33px 10px 0 0; padding: 20px;
-    background-color: #efefef; border-radius: 20px; 
+    background-color: #efefef; border-radius: 20px;
 }
 footer .poweredby img { height: 50px; }
 
@@ -19,3 +19,26 @@ footer .poweredby img { height: 50px; }
     color: rgba(255, 150, 0, 1);
 }
 
+.nav-orange, .nav-orange:hover {
+    color: rgba(255, 150, 0, 0.7);
+}
+
+.form-switch .form-check-input {
+    background-position: left center;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23000'/%3e%3c/svg%3e");
+    background-color: rgba(255, 150, 0, 0.2);
+    border-color: rgba(255, 150, 0, 0.2);
+}
+.form-switch .form-check-input:checked {
+    background-position: right center;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23000'/%3e%3c/svg%3e");
+    background-color: rgba(255, 150, 0, 0.7);
+    border-color: rgba(255, 150, 0, 0.7);
+}
+
+
+/* required by fixed-top navbar*/
+body { padding-top: 75px; }
+@media screen and (max-width: 768px) {
+    body { padding-top: 0px; }
+}

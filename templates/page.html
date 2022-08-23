@@ -4,19 +4,24 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
         <meta data-template="config:app-meta"/>
 
-         <!-- include Aladin Lite CSS file in the head section of your page -->
-        <link rel="stylesheet" href="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css"/>
 
         <link rel="shortcut icon" href="resources/images/jmmc_favicon.ico"/>
+
         <link rel="stylesheet" type="text/css" href="resources/css/bootstrap.min.css"/>
         <link rel="stylesheet" type="text/css" href="resources/css/bootstrap-icons/font/bootstrap-icons.css"/>
+        <link rel="stylesheet" type="text/css" href="resources/css/dataTables.bootstrap5.min.css"/>
+        <link rel="stylesheet" href="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css"/>
         <link rel="stylesheet" type="text/css" href="resources/css/style.css"/>
 
-        <script type="text/javascript" src="resources/scripts/bootstrap.bundle.min.js"/>
         <script type="text/javascript" src="resources/scripts/jquery.min.js"/>
+        <script type="text/javascript" src="resources/scripts/bootstrap.bundle.min.js"/>
+        <script type="text/javascript" src="resources/scripts/jquery.dataTables.min.js"/>
+        <script type="text/javascript" src="resources/scripts/dataTables.bootstrap5.min.js"/>
+
+
     </head>
     <body id="body" data-template="jmmc-about:changelog">
-        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark">
             <div class="container-fluid">
                 <a class="navbar-brand" data-template="jmmc-web:navbar-li">JMMC</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavDarkDropdown" aria-controls="navbarNavDarkDropdown" aria-expanded="false" aria-label="Toggle navigation">
@@ -42,6 +47,7 @@
                                 <i class="bi bi-house"/> Home</a>
                         </li>
                     </ul>
+                    <li data-template="app:dyn-nav-li"/>
                     <li class="navbar-nav">
                     <a class="nav-link" href="about.html">
                         V.<span data-template="jmmc-about:version"/>

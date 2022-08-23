@@ -15,7 +15,14 @@
      <change version="1.1.3">
       <ul>
         <li>Refactor a generic code using a json config for default constraints and various catalogs.</li>
-        <li>Add a new catalog : <a href="https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=I/353">The Guide Star Catalog, Version 2.4.2 (GSC2.4.2) (STScI, 2020)</a></li>
+        <li>Add new catalogs :
+          <ul>
+            <li><a href="https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=I/353">The Guide Star Catalog, Version 2.4.2 (GSC2.4.2) (STScI, 2020)</a></li>
+            <li><a href="https://gea.esac.esa.int/archive/">GAIA DR3</a></li>
+          </ul>
+        </li>
+        <li>Fix catalog's epochs</li>
+        <li>Enable table sortering by any column</li>
       </ul>
     </change>
     <change version="1.1.2">
