@@ -146,7 +146,7 @@ declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*
                     <input class="form-check-input" type="checkbox" onClick='$(".{$k}").toggleClass("d-none");'/><label class="form-check-label">{$label}</label>
                 </div>
             })
-        }</li>
+        }</li>[exists($identifiers)]
 };
 
 declare %templates:wrap function app:form($node as node(), $model as map(*), $identifiers as xs:string*) {
