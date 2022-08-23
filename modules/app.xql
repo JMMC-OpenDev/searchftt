@@ -292,7 +292,7 @@ declare function app:search-simbad($id, $max, $s) {
         return
         <div class="aaaaa">
             <table class="table table-responsive-xxl table-light datatable" data-found-targets="{$tr-count}" data-src-targets="Simbad">
-                <thead><tr><th><span class="badge rounded-pill bg-dark">{$tr-count}</span> Simbad Name</th>
+                <thead><tr><th><span class="badge rounded-pill bg-dark">{$tr-count}</span>&#160;Simbad&#160;Name</th>
                     {for $f at $cpos in $votable//*:FIELD where $cpos != $app:id_index
                         let $unit :=if (ends-with($f/@name, "_as")) then "[arcsec]" else if (data($f/@unit)) then "["|| $f/@unit ||"]" else ()
                         let $name :=if (ends-with($f/@name, "_as")) then replace($f/@name, "_as", "") else data($f/@name)
@@ -377,7 +377,7 @@ declare function app:search($id, $max, $s, $cat) {
                             return
                             <th title="{$title}">{if($field_names[$cpos]=$detail_cols) then attribute {"class"} {"d-none extcols table-info"} else ()}{$name} &#160; {$unit}</th>
                         else
-                            <th><span class="badge rounded-pill bg-dark">{$tr-count}</span> Simbad link for <u>{$cat?cat_name}</u></th>
+                            <th><span class="badge rounded-pill bg-dark">{$tr-count}</span>&#160;Simbad&#160;link&#160;for&#160;<u>{$cat?cat_name}</u></th>
                     }
                     <th>GetStar</th>
                 </tr></thead>
@@ -407,6 +407,7 @@ declare function app:search($id, $max, $s, $cat) {
     else
         <div>
             Sorry, no fringe traking star found for <b>{$s/name/text()} in {$cat?cat_name}</b>.{$query-code} {$src}
+            <code class="extdebug d-none">{serialize($votable)}</code>
         </div>
 };
 
@@ -418,16 +419,13 @@ declare function app:searchftt-query($identifier, $max, $cat as map(*)){
     let $pmra := try{ xs:double($s/pmra) } catch * {0}
     let $pmdec := try{ xs:double($s/pmdec) } catch * {0}
 
-
-
-    (:
-    let $distance_J2000 := <dist_as>DISTANCE( POINT('ICRS', {$cat?ra}-(({$cat?epoch}-2000.0)*COALESCE({$cat?pmra},0.0))/3600000.0, {$cat?dec}-(({$cat?epoch}-2000.0)*COALESCE({$cat?pmdec}, 0.0))/3600000.0 ), POINT('ICRS', {$ra}, {$dec}))*3600.0 as j2000_dist_as</dist_as>
-    GAVO does not support COALESCE inside as previous compact form
-    let $distance_J2000 := <dist_as>COALESCE(
-        DISTANCE( POINT('ICRS', {$cat?ra}-(({$cat?epoch}-2000.0)*{$cat?pmra})/3600000.0, {$cat?dec}-(({$cat?epoch}-2000.0)*{$cat?pmdec})/3600000.0 ), POINT('ICRS', {$ra}, {$dec}))*3600.0
-        ,DISTANCE( POINT('ICRS', {$cat?ra}, {$cat?dec} ), POINT('ICRS', {$ra}, {$dec}) )*3600.0) as j2000_dist_as</dist_as>
-    and VizieR forbid it  :( :)
-    let $distance_J2000 := <dist_as>DISTANCE( POINT('ICRS', {$cat?ra}, {$cat?dec}), POINT('ICRS', {$ra}-(({$cat?epoch}-2000.0)*{$cat?pmra})/3600000.0, {$dec}-(({$cat?epoch}-2000.0)*{$pmdec})/3600000.0 ))*3600.0 as j2000_dist_as</dist_as>
+    (: We could have built query with COALESCE to replace missing pmra by 0, but:
+        GAVO does not support it inside a formulae and VizieR forbid it  :(
+    :)
+    let $distance_J2000 := <dist_as>DISTANCE(
+        POINT( 'ICRS', {$cat?ra} - ( ({$cat?epoch}-2000.0) * {$cat?pmra} ) / 3600000.0, {$cat?dec} - ( ( {$cat?epoch}-2000.0) * {$cat?pmdec} ) / 3600000.0  ),
+        POINT( 'ICRS', {$ra}, {$dec} )
+        )*3600.0 as j2000_dist_as</dist_as>
 
     let $distance_catalog :=
         <dist_as>DISTANCE( POINT('ICRS', {$cat?ra}, {$cat?dec}), POINT('ICRS', {$ra}-((2000.0-{$cat?epoch})*{$pmra})/3600000.0, {$dec}-((2000.0-{$cat?epoch})*{$pmdec})/3600000.0 ))*3600.0 as cat_dist_as</dist_as>
@@ -443,7 +441,9 @@ declare function app:searchftt-query($identifier, $max, $cat as map(*)){
     (: escape catalogs with / inside  (VizieR case):)
     let $from := if(contains($cat?from, "/")) then '"'||$cat?from||'"' else $cat?from
 
-
+    let $numerical_epoch := try{let $num := xs:double($cat?epoch) return true() }catch*{false()}
+    let $ra_in_cat := if($numerical_epoch) then <ra>{$ra}-((2000.0-{$cat?epoch})*{$pmra})/3600000.0</ra> else $ra
+    let $dec_in_cat := if($numerical_epoch) then <dec>{$dec}-((2000.0-{$cat?epoch})*{$pmdec})/3600000.0</dec> else $dec
 
     let $mags := string-join((
         <m>{$cat?mag_k} as mag_ks</m>
@@ -467,7 +467,7 @@ declare function app:searchftt-query($identifier, $max, $cat as map(*)){
     WHERE
         {$max-mag-filters}
             AND
-        CONTAINS( POINT('ICRS', {$cat?ra}, {$cat?dec}), CIRCLE('ICRS', {$ra}, {$dec}, {$max?dist_as}/3600.0) ) = 1
+        CONTAINS( POINT('ICRS', {$cat?ra}, {$cat?dec}), CIRCLE('ICRS', {$ra_in_cat}, {$dec_in_cat}, {$max?dist_as}/3600.0) ) = 1
     ORDER BY
         j2000_dist_as
     </text>
