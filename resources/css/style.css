@@ -19,8 +19,12 @@ footer .poweredby img { height: 50px; }
     color: rgba(255, 150, 0, 1);
 }
 
-.nav-orange, .nav-orange:hover {
+.nav-orange {
     color: rgba(255, 150, 0, 0.7);
+}
+
+.nav-orange:hover {
+    color: rgba(255, 150, 0, 1);
 }
 
 .form-switch .form-check-input {
