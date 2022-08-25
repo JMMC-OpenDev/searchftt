@@ -26,7 +26,7 @@ declare variable $app:json-conf :='{
         "max_dist_as" : 30,
         "max_rec" : 25
     },
-    "extended-cols" : [ "pmra", "pmdec", "pmde", "epoch", "cat_dist_as"],
+    "extended-cols" : [ "pmra", "pmdec", "pmde", "epoch", "cat_dist_as", "today_dist_as"],
     "samestar-dist_deg" : 2.78E-4,
     "samestar-dist_as" : 1,
     "catalogs":{
@@ -115,11 +115,6 @@ declare variable $app:json-conf :='{
 }';
 
 declare variable $app:conf := parse-json($app:json-conf);
-
-(: harcoded column indexes so we can present an html on top of a votable (without dynamic lookup) - MUST be consistent with generated queries :)
-declare variable $app:id_index := 1;
-declare variable $app:ra_index := 3;
-declare variable $app:dec_index := 4;
 
 (:~
  : Build a map with default value comming from given config or overidden by user params.
@@ -289,12 +284,13 @@ declare function app:search-simbad($id, $max, $s) {
         if(exists($votable//*:TABLEDATA/*)) then
         let $detail_cols := for $e in array:flatten($app:conf?extended-cols) return lower-case($e) (: values correspond to column names given by AS ...:)
         let $field_names := for $e in $votable//*:FIELD/@name return lower-case($e)
+        let $source_id_idx := index-of($field_names, "source_id")
         let $tr-count := count($votable//*:TABLEDATA/*)
         return
         <div class="aaaaa">
             <table class="table table-responsive-xxl table-light datatable" data-found-targets="{$tr-count}" data-src-targets="Simbad">
                 <thead><tr><th><span class="badge rounded-pill bg-dark">{$tr-count}</span>&#160;Simbad&#160;Name</th>
-                    {for $f at $cpos in $votable//*:FIELD where $cpos != $app:id_index
+                    {for $f at $cpos in $votable//*:FIELD where $cpos != $source_id_idx
                         let $unit :=if (ends-with($f/@name, "_as")) then "[arcsec]" else if (data($f/@unit)) then "["|| $f/@unit ||"]" else ()
                         let $name :=if (ends-with($f/@name, "_as")) then replace($f/@name, "_as", "") else data($f/@name)
                         return
@@ -334,7 +330,7 @@ declare function app:searchftt-simbad-query($identifier, $max) as xs:string{
     let $max-mag-filters := <text>( K&lt;{$max?magK_UT} AND V&lt;{$max?magV} ) OR ( K&lt;{$max?magK_AT} AND R&lt;{$max?magR})</text>
     let $query := <text>
     SELECT
-        DISTINCT main_id, DISTANCE(POINT('ICRS', ra, dec),POINT('ICRS', {$ra},{$dec}))*3600.0 as dist_as, ra, dec, pmra,pmdec, G, K, V, R, otype_txt
+        DISTINCT main_id as source_id, DISTANCE(POINT('ICRS', ra, dec),POINT('ICRS', {$ra},{$dec}))*3600.0 as dist_as, ra, dec, pmra,pmdec, G, K, V, R, otype_txt
     FROM
         basic JOIN allfluxes ON oid=oidref JOIN ident USING(oidref)
     WHERE
@@ -361,15 +357,17 @@ declare function app:search($id, $max, $s, $cat) {
     if(exists($votable//*:TABLEDATA/*)) then
         let $detail_cols := for $e in (array:flatten($app:conf?extended-cols), $cat?detail?*) return lower-case($e) (: values correspond to column names given by AS ...:)
         let $field_names := for $e in $votable//*:FIELD/@name return lower-case($e)
+        let $source_id_idx := index-of($field_names, "source_id")
         let $tr-count := count($votable//*:TABLEDATA/*)
         return
         <div class="table-responsive">
             <table class="table table-light datatable" data-found-targets="{$tr-count}" data-src-targets="{$cat?cat_name}">
                 <thead><tr>
                     {for $f at $cpos in $votable//*:FIELD return
-                        if ($cpos != $app:id_index) then
+                        if ($cpos != $source_id_idx) then
                             let $title := if("cat_dist_as"=$f/@name) then "Distance computed moving science star to the catalog epoch using its proper motion"
                                 else if("j2000_dist_as"=$f/@name) then "Distance computed moving candidates to J2000"
+                                else if("today_dist_as"=$f/@name) then "Distance computed moving science star and candidates to current year epoch"
                                 else $f/*:DESCRIPTION
                             let $name := if(starts-with($f/@name, "computed_")) then replace($f/@name, "computed_", "") else data($f/@name)
                             let $name :=  replace($name, "j_2mass", "2MASS&#160;J")
@@ -386,11 +384,11 @@ declare function app:search($id, $max, $s, $cat) {
                 {
                     for $tr in $votable//*:TABLEDATA/* return
                         <tr>{
-                            let $simbad_id := $cat?simbad_prefix_id||$tr/*[$app:id_index]
+                            let $simbad_id := $cat?simbad_prefix_id||$tr/*[$source_id_idx]
                             let $simbad := jmmc-simbad:resolve-by-name($simbad_id)
                             let $target_link := if ($simbad/ra) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
-                                let $ra := $tr/*[$app:ra_index]
-                                let $dec := $tr/*[$app:dec_index]
+                                let $ra := $tr/*[index-of($field_names, "ra")]
+                                let $dec := $tr/*[index-of($field_names, "dec")]
                                 return <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$simbad_id}">{replace($simbad_id," ","&#160;")}</a>
                             let $getstar-url := "https://apps.jmmc.fr/~sclws/getstar/sclwsGetStarProxy.php?star="||encode-for-uri($simbad/name)
                             let $getstar-link := if ($simbad/ra) then <a href="{$getstar-url}" target="{$simbad/name}"><i class="bi bi-box-arrow-up-right"></i></a>  else "-"
@@ -452,6 +450,15 @@ declare function app:searchftt-query($identifier, $max, $cat as map(*)){
     let $ra_in_cat := if($numerical_epoch) then <ra>{$ra}-((2000.0-{$cat?epoch})*{$pmra})/3600000.0</ra> else $ra
     let $dec_in_cat := if($numerical_epoch) then <dec>{$dec}-((2000.0-{$cat?epoch})*{$pmdec})/3600000.0</dec> else $dec
 
+    (:
+    no significant changes in the result / leved commented
+    let $current-year :=  year-from-date(current-date())
+    let $distance_today := <dist_as>DISTANCE(
+        POINT( 'ICRS', {$cat?ra} - ( ({$cat?epoch}-{$current-year}) * {$cat?pmra} ) / 3600000.0, {$cat?dec} - ( ( {$cat?epoch}-{$current-year}) * {$cat?pmdec} ) / 3600000.0  ),
+        POINT( 'ICRS', {$ra}-((2000.0-{$current-year})*{$pmra})/3600000.0, {$dec}-((2000.0-{$current-year})*{$pmdec})/3600000.0 )
+        )*3600.0 as today_dist_as</dist_as>
+    :)
+
     let $mags := string-join((
         <m>{$cat?mag_k} as mag_ks</m>
         ,<m>{$cat?mag_g} as mag_g</m>[$cat?mag_g]
@@ -462,10 +469,10 @@ declare function app:searchftt-query($identifier, $max, $cat as map(*)){
 
     let $query := <text>
     SELECT
-        {$cat?source_id},
+        {$cat?source_id} as source_id,
         {$distance_J2000},
         {$distance_catalog},
-        {$cat?ra}, {$cat?dec},
+        {$cat?ra} as ra, {$cat?dec} as dec,
         {$cat?pmra}, {$cat?pmdec},
         {$cat?epoch} as epoch,
         {$mags}
