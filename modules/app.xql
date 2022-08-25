@@ -16,7 +16,7 @@ import module namespace jmmc-tap="http://exist.jmmc.fr/jmmc-resources/tap" at "/
 import module namespace jmmc-simbad="http://exist.jmmc.fr/jmmc-resources/simbad" at "/db/apps/jmmc-resources/content/jmmc-simbad.xql";
 (:import module namespace jmmc-astro="http://exist.jmmc.fr/jmmc-resources/astro" at "/db/apps/jmmc-resources/content/jmmc-astro.xql";:) (: WARNING this module require to enable eXistDB's Java Binding :)
 
-(: Main config to unify catalog accross their colnames  :)
+(: Main config to unify catalog accross their colnames  - we could try to put Simbad inside ? :)
 declare variable $app:json-conf :='{
     "default":{
         "max_magV" : 15,
@@ -352,7 +352,7 @@ declare function app:searchftt-simbad-query($identifier, $max) as xs:string{
 declare function app:search($id, $max, $s, $cat) {
 	let $query := app:searchftt-query($id, $max, $cat)
     let $query-code := <pre class="extquery d-none"><br/>{data($query)}</pre>
-	let $votable := try { jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $max?rec, $cat?tap_format) } catch * {()}
+    let $votable := jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $max?rec, $cat?tap_format)
 	let $src := if ($cat?tap_viewer)  then <a class="extquery d-none" href="{$cat?tap_viewer||encode-for-uri($query)}">View original votable</a> else ()
 
     return
@@ -406,8 +406,13 @@ declare function app:search($id, $max, $s, $cat) {
         </div>
     else
         <div>
-            Sorry, no fringe traking star found for <b>{$s/name/text()} in {$cat?cat_name}</b>.{$query-code} {$src}
-            <code class="extdebug d-none">{serialize($votable)}</code>
+            {
+                if ( $votable//*:INFO[@name="QUERY_STATUS" and @value="ERROR"] ) then let $anchor := "error-"||util:uuid() return
+                    <a id="{$anchor}" href="#{$anchor}" class="text-danger" onclick='$(".extdebug").toggleClass("d-none");'>Sorry, an error occured in the query.</a>
+                else
+                    <span>Sorry, no fringe traking star found for <b>{$s/name/text()} in {$cat?cat_name}</b>.</span>
+            }
+            {$query-code} {$src} <code class="extdebug d-none"><br/>{serialize($votable)}</code>
         </div>
 };
 
