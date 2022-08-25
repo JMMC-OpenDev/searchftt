@@ -138,7 +138,7 @@ declare function app:defaults() as map(*){
 };
 
 declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*), $identifiers as xs:string*) {
-    let $toggle-classes := map{ "extcols" : "extended columns", "extquery" : "queries", "extdebug" : "debug" }
+    let $toggle-classes := map{ "extcols" : "extended columns", "extquery" : "queries", "extdebug" : "debug", "exttable" : "hidden table" }
     return
         <li class="nav-link">{
             map:for-each( $toggle-classes, function ($k, $label) {
@@ -173,6 +173,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
         <p>
             <ul>
                 <li>Enter comma separated names ( resolved by <a href="http://simbad.u-strasbg.fr">Simbad</a>) or coordinates (RA +/-DEC in degrees J2000), in the TextBox below.</li>
+                <li>Move your pointer to the column titles of the result tables to get the column descriptions.</li>
                 <li>To send a target to <a href="https://www.jmmc.fr/getstar">Aspro2</a> (already open), click on the icon in the <a href="https://www.jmmc.fr/getstar">GetStar</a> column, then press "Send Votable".</li>
                 <li>Please <a href="http://www.jmmc.fr/feedback">fill a report</a> for any question or remark.</li>
             </ul>
@@ -269,7 +270,7 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
                                     else ()
                                 }
                         </div>
-                        <div class="row">
+                        <div class="row exttable">
                             { $info }
                         </div>
                     </div>
@@ -367,8 +368,9 @@ declare function app:search($id, $max, $s, $cat) {
                 <thead><tr>
                     {for $f at $cpos in $votable//*:FIELD return
                         if ($cpos != $app:id_index) then
-                            let $title := if("cat_dist_as"=$f/@name) then "Distance computed moving science star to the catalog epoch using its proper motion" else $f/*:DESCRIPTION
-                            let $title := if("j2000_dist_as"=$f/@name) then "Distance computed moving candidates to J2000" else $f/*:DESCRIPTION
+                            let $title := if("cat_dist_as"=$f/@name) then "Distance computed moving science star to the catalog epoch using its proper motion"
+                                else if("j2000_dist_as"=$f/@name) then "Distance computed moving candidates to J2000"
+                                else $f/*:DESCRIPTION
                             let $name := if(starts-with($f/@name, "computed_")) then replace($f/@name, "computed_", "") else data($f/@name)
                             let $name :=  replace($name, "j_2mass", "2MASS&#160;J")
                             let $name :=if (ends-with($name, "_as")) then replace($name, "_as", "") else data($name)
