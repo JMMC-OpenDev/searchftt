@@ -21,8 +21,8 @@
             <li><a href="https://gea.esac.esa.int/archive/">GAIA DR3</a></li>
           </ul>
         </li>
-        <li>Fix catalog's epochs</li>
-        <li>Enable table sortering by any column</li>
+        <li>Fix catalog's epochs and build more accurate queries.</li>
+        <li>Enable table sortering by any column.</li>
       </ul>
     </change>
     <change version="1.1.2">
