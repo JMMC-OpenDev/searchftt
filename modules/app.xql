@@ -191,7 +191,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
         <script type="text/javascript">
         $(document).ready(function() {{
         $('.datatable').DataTable( {{
-            "paging": false,"searching":false,"info": false,
+            "paging": false,"searching":false,"info": false,"order": []
         }});
 
         }});
