@@ -4,7 +4,7 @@
   <description>Search Fringe Tracking Targets</description>
   <author>JMMC Tech Group</author>
   <website>https://www.jmmc.fr</website>
-  <status>alpha</status>
+  <status>beta</status>
   <license>AGPL-3.0</license>
   <copyright>true</copyright>
   <type>application</type>
