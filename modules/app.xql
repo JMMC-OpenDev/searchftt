@@ -32,6 +32,7 @@ declare variable $app:json-conf :='{
     "catalogs":{
         "gdr2ap": {
             "cat_name":"GDR2AP",
+            "main_cat":false,
             "description": "The <a href=&apos;https://ui.adsabs.harvard.edu/abs/2022arXiv220103252F/abstract&apos;>Astrophysical Parameters from Gaia DR2, 2MASS &amp;amp; AllWISE</a>  catalog through the GAVO DC.",
             "tap_endpoint": "https://dc.zah.uni-heidelberg.de/tap/sync",
             "tap_format" : "",
@@ -52,6 +53,7 @@ declare variable $app:json-conf :='{
             "from"    : "gaia.dr2light JOIN gdr2ap.main ON gaia.dr2light.source_id=gdr2ap.main.source_id"
         },"esagaia3": {
             "cat_name"    : "Gaia DR3",
+            "main_cat":true,
             "description" : "Gaia DR3 catalogues and cross-matched catalogues though <a href=&apos;https://www.cosmos.esa.int/web/gaia-users/archive&apos;>ESA archive center</a>.",
             "tap_endpoint" : "https://gea.esac.esa.int/tap-server/tap/sync",
             "tap_format"   : "votable_plain",
@@ -71,6 +73,7 @@ declare variable $app:json-conf :='{
             "from"        : "gaiadr3.gaia_source as gaia JOIN gaiaedr3.tmass_psc_xsc_best_neighbour AS tmass_nb USING (source_id) JOIN gaiaedr3.tmass_psc_xsc_join AS xjoin    ON tmass_nb.original_ext_source_id = xjoin.original_psc_source_id JOIN gaiadr1.tmass_original_valid AS tmass ON xjoin.original_psc_source_id = tmass.designation"
         },"esagaia2": {
             "cat_name"    : "Gaia DR2",
+            "main_cat":false,
             "description" : "Gaia DR2 catalogues <a href=&apos;https://arxiv.org/pdf/1808.09151.pdf&apos;>with its external catalogues cross-match</a> though <a href=&apos;https://gea.esac.esa.int/archive/&apos;>ESA archive center</a>.",
             "tap_endpoint" : "https://gea.esac.esa.int/tap-server/tap/sync",
             "tap_format"   : "votable_plain",
@@ -90,6 +93,7 @@ declare variable $app:json-conf :='{
             "from"        : "gaiadr2.gaia_source as gaia JOIN gaiadr2.tmass_best_neighbour as tmass_nb USING (source_id) JOIN gaiadr1.tmass_original_valid as tmass ON tmass.tmass_oid = tmass_nb.tmass_oid"
         },"gsc":    {
             "cat_name"    : "GSC2",
+            "main_cat":true,
             "description" : "<a href=&apos;https://cdsarc.cds.unistra.fr/viz-bin/cat/I/353&apos;>The Guide Star Catalogue, Version 2.4.2 (2020)</a>",
             "tap_endpoint" : "http://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync",
             "tap_format"   : "",
@@ -133,7 +137,7 @@ declare function app:defaults() as map(*){
 };
 
 declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*), $identifiers as xs:string*) {
-    let $toggle-classes := map{ "extcols" : "extended columns", "extquery" : "queries", "extdebug" : "debug", "exttable" : "hidden table" }
+    let $toggle-classes := map{ "extcats" : "extended catalogs", "extcols" : "extended columns", "extquery" : "queries", "extdebug" : "debug", "exttable" : "hidden table" }
     return
         <li class="nav-link">{
             map:for-each( $toggle-classes, function ($k, $label) {
@@ -153,12 +157,12 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
         <p>This newborn tool is in its first version and is subject to various changes in its early development phase.</p>
         <h2>Underlying method:</h2>
         <p>
-            You can query one or several Science Targets. For each of them, three results of Fringe Tracker Targets will be given using following research methods: <br/>
-            <ol>
+            You can query one or several Science Targets. For each of them, Fringe Tracker Targets will be given using following research methods: <br/>
+            <ul>
                 <li>Simbad for sources that are suitable for fringe tracking.</li>
-                { for $cat in $app:conf?catalogs?* return <li><b>{$cat?cat_name}</b>&#160;{parse-xml("<span>"||$cat?description||"</span>")}</li>}
-
-            </ol>
+                <li>Main catalogs<ul>{ for $cat in $app:conf?catalogs?* where $cat?main_cat return <li><b>{$cat?cat_name}</b>&#160;{parse-xml("<span>"||$cat?description||"</span>")}</li>}</ul></li>
+                <li>Additionnal catalogs (use toggle button in the menu to get result tables)<ul>{ for $cat in $app:conf?catalogs?* where not($cat?main_cat) return <li><b>{$cat?cat_name}</b>&#160;{parse-xml("<span>"||$cat?description||"</span>")}</li>}</ul></li>
+            </ul>
             Each query is performed within {$max?dist_as}&apos; of the Science Target.
             A magnitude filter is applied on every Fringe Tracker Targets according to the best limits offered in P110
             for <b>UT (MACAO) OR AT (NAOMI)</b>  respectively <b>( K &lt; {$max?magK_UT} AND V &lt; {$max?magV} ) OR ( K &lt; {$max?magK_AT} AND R&lt;{$max?magR} )</b>.
@@ -224,15 +228,14 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
         let $s := app:resolve-by-name($id)
         let $ra := $s/ra let $dec := $s/dec
         let $info := if(exists($s/ra))then
-                <ol class="list-group list-group-numbered">
-                {
-                    for $e in (
-                        app:search-simbad($id, $max, $s),
-                        for $cat in $app:conf?catalogs?* return app:search($id, $max, $s, $cat)
-                        )
-                        return <li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto">{$e}</div></li>
-                }
-                </ol>
+                <ul class="list-group list-group-numberedaaaa">
+                    <li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto">{app:search-simbad($id, $max, $s)}</div></li>
+                    {
+                        for $cat in $app:conf?catalogs?* order by $cat?main_cat descending return
+                            <li class="list-group-item d-flex justify-content-between align-items-start {if($cat?main_cat) then () else "extcats d-none"}"><div class="ms-2 me-auto">{app:search($id, $max, $s, $cat)}</div></li>
+
+                    }
+                </ul>
             else
                 <div>Can&apos;t get position from Simbad, please check your identifier.</div>
         let $state := if(exists($info//table)) then "success" else if(exists($s/ra)) then "warning" else "danger"
@@ -278,7 +281,7 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
 declare function app:search-simbad($id, $max, $s) {
 	let $query := app:searchftt-simbad-query($id,$max)
     let $query-code := <pre class="extquery d-none"><br/>{data($query)}</pre>
-    let $votable := try{jmmc-tap:tap-adql-query($jmmc-tap:SIMBAD-SYNC, $query, $max?rec) } catch * {()}
+    let $votable := try{jmmc-tap:tap-adql-query($jmmc-tap:SIMBAD-SYNC, $query, $max?rec) } catch * {<error>{$err:description}</error>}
     let $html-form-url := ""
     return
         if(exists($votable//*:TABLEDATA/*)) then
@@ -294,7 +297,7 @@ declare function app:search-simbad($id, $max, $s) {
                         let $unit :=if (ends-with($f/@name, "_as")) then "[arcsec]" else if (data($f/@unit)) then "["|| $f/@unit ||"]" else ()
                         let $name :=if (ends-with($f/@name, "_as")) then replace($f/@name, "_as", "") else data($f/@name)
                         return
-                        <th title="{$f/*:DESCRIPTION}">{if($field_names[$cpos]=$detail_cols) then attribute {"class"} {"d-none extcols table-info"} else ()}{$name} &#160; {$unit}</th>
+                        <th title="{$f/*:DESCRIPTION}">{if($field_names[$cpos]=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()}{$name} &#160; {$unit}</th>
                     }
                     <th>GetStar</th>
                 </tr></thead>
@@ -309,7 +312,7 @@ declare function app:search-simbad($id, $max, $s) {
                                 (
                                     <td>{$target_link}</td>,
                                     for $td at $cpos in $tr/* where $cpos != 1 return
-                                        element {"td"} {attribute {"class"} {if( $field_names[$cpos]=$detail_cols ) then "d-none extcols table-info" else ()},try { let $d := xs:double($td) return format-number($d, "0.###") } catch * { if(string-length($td)>1) then data($td) else "-" }},
+                                        element {"td"} {attribute {"class"} {if( $field_names[$cpos]=$detail_cols ) then "d-none extcols table-primary" else ()},try { let $d := xs:double($td) return format-number($d, "0.###") } catch * { if(string-length($td)>1) then data($td) else "-" }},
                                     <td>{$getstar-link}<!--{$getstar-votable//*:TABLEDATA/*:TR/*:TD[121]/text()}--></td>
                                 )
                         }</tr>
@@ -319,7 +322,14 @@ declare function app:search-simbad($id, $max, $s) {
         </div>
         else
             <div>
-                Sorry, no fringe traking star found for <b>{$s/name/text()}</b> in Simbad. {$query-code}
+                {
+                    if ( name($votable)='error' or $votable//*:INFO[@name="QUERY_STATUS" and @value="ERROR"]) then let $anchor := "error-"||util:uuid() return
+                        (<a id="{$anchor}" href="#{$anchor}" class="text-danger" onclick='$(".extdebug").toggleClass("d-none");'>Sorry, an error occured in the query.</a>
+                       , <code class="extdebug d-none"><br/>{serialize($votable)}</code>)
+                    else
+                        <span>Sorry, no fringe traking star found for <b>{$s/name/text()} in Simbad</b>. <code class="extdebug d-none"><br/>{serialize($votable)}</code></span>
+                }
+                {$query-code}
             </div>
 };
 
@@ -334,11 +344,9 @@ declare function app:searchftt-simbad-query($identifier, $max) as xs:string{
     FROM
         basic JOIN allfluxes ON oid=oidref JOIN ident USING(oidref)
     WHERE
-        ( {$max-mag-filters} )
-          AND
-        CONTAINS( POINT('ICRS', ra, dec), CIRCLE('ICRS', {$ra}, {$dec}, {$app:conf?samestar-dist_deg}) ) = 0
-          AND
         CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', {$ra}, {$dec}, {$max?dist_as}/3600.0)) = 1
+          AND
+        ( {$max-mag-filters} )
     ORDER BY
         dist_as;
     </text>
@@ -351,7 +359,6 @@ declare function app:search($id, $max, $s, $cat) {
     let $query-code := <pre class="extquery d-none"><br/>{data($query)}</pre>
     let $votable := jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $max?rec, $cat?tap_format)
 	let $src := if ($cat?tap_viewer)  then <a class="extquery d-none" href="{$cat?tap_viewer||encode-for-uri($query)}">View original votable</a> else ()
-
     return
 
     if(exists($votable//*:TABLEDATA/*)) then
@@ -375,7 +382,7 @@ declare function app:search($id, $max, $s, $cat) {
                             let $unit :=if (ends-with($f/@name, "_as")) then "[arcsec]" else if(starts-with($f/@name, "computed_")) then "(computed)" else if (data($f/@unit)) then "["|| $f/@unit ||"]" else ()
 
                             return
-                            <th title="{$title}">{if($field_names[$cpos]=$detail_cols) then attribute {"class"} {"d-none extcols table-info"} else ()}{$name} &#160; {$unit}</th>
+                            <th title="{$title}">{if($field_names[$cpos]=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()}{$name} &#160; {$unit}</th>
                         else
                             <th><span class="badge rounded-pill bg-dark">{$tr-count}</span>&#160;Simbad&#160;link&#160;for&#160;<u>{$cat?cat_name}</u></th>
                     }
@@ -396,7 +403,7 @@ declare function app:search($id, $max, $s, $cat) {
                                 (
                                     <td>{$target_link}</td>,
                                     for $td at $cpos in $tr/* where $cpos != 1 return
-                                        element {"td"} {attribute {"class"} {if( $field_names[$cpos]=$detail_cols ) then "d-none extcols table-info" else ()},try { let $d := xs:double($td) return format-number($d, "0.###") } catch * { if(string-length($td)>1) then data($td) else "-" }},
+                                        element {"td"} {attribute {"class"} {if( $field_names[$cpos]=$detail_cols ) then "d-none extcols table-primary" else ()},try { let $d := xs:double($td) return format-number($d, "0.###") } catch * { if(string-length($td)>1) then data($td) else "-" }},
                                     <td>{$getstar-link}<!--{$getstar-votable//*:TABLEDATA/*:TR/*:TD[121]/text()}--></td>
                                 )
                         }</tr>
@@ -408,11 +415,12 @@ declare function app:search($id, $max, $s, $cat) {
         <div>
             {
                 if ( $votable//*:INFO[@name="QUERY_STATUS" and @value="ERROR"] ) then let $anchor := "error-"||util:uuid() return
-                    <a id="{$anchor}" href="#{$anchor}" class="text-danger" onclick='$(".extdebug").toggleClass("d-none");'>Sorry, an error occured in the query.</a>
+                    (<a id="{$anchor}" href="#{$anchor}" class="text-danger" onclick='$(".extdebug").toggleClass("d-none");'>Sorry, an error occured in the query.</a>
+                    ,<code class="extdebug d-none"><br/>{serialize($votable)}</code>)
                 else
                     <span>Sorry, no fringe traking star found for <b>{$s/name/text()} in {$cat?cat_name}</b>.</span>
             }
-            {$query-code} {$src} <code class="extdebug d-none"><br/>{serialize($votable)}</code>
+            {$query-code} {$src}
         </div>
 };
 
@@ -479,9 +487,9 @@ declare function app:searchftt-query($identifier, $max, $cat as map(*)){
     FROM
         {$from}
     WHERE
-        {$max-mag-filters}
-            AND
         CONTAINS( POINT('ICRS', {$cat?ra}, {$cat?dec}), CIRCLE('ICRS', {$ra_in_cat}, {$dec_in_cat}, {$max?dist_as}/3600.0) ) = 1
+            AND
+        {$max-mag-filters}
     ORDER BY
         j2000_dist_as
     </text>

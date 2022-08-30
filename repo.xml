@@ -4,7 +4,7 @@
   <description>Search Fringe Tracking Targets</description>
   <author>JMMC Tech Group</author>
   <website>https://www.jmmc.fr</website>
-  <status>beta</status>
+  <status>stable</status><!-- stable/beta/alpha -->
   <license>AGPL-3.0</license>
   <copyright>true</copyright>
   <type>application</type>
@@ -12,17 +12,18 @@
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
   <changelog xmlns="">
-     <change version="1.1.3">
+     <change version="1.2">
       <ul>
-        <li>Refactor a generic code using a json config for default constraints and various catalogs.</li>
-        <li>Add new catalogs :
+        <li>Add new catalogs as new main ones (old are hidden by default):
           <ul>
             <li><a href="https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=I/353">The Guide Star Catalog, Version 2.4.2 (GSC2.4.2) (STScI, 2020)</a></li>
             <li><a href="https://gea.esac.esa.int/archive/">GAIA DR3</a></li>
           </ul>
         </li>
         <li>Fix catalog's epochs and build more accurate queries.</li>
+        <li>Simbad search do not hide anymore the science star in the result table when compatible with mag filters.</li>
         <li>Enable table sortering by any column.</li>
+        <li>iTechnival - refactor a generic code using a json config for default constraints and various catalogs.</li>
       </ul>
     </change>
     <change version="1.1.2">

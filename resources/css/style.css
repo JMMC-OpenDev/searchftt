@@ -41,6 +41,7 @@ footer .poweredby img { height: 50px; }
 }
 
 
+
 /* required by fixed-top navbar*/
 body { padding-top: 75px; }
 @media screen and (max-width: 768px) {
