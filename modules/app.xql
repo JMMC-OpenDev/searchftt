@@ -123,15 +123,19 @@ declare variable $app:conf := parse-json($app:json-conf);
 (:~
  : Build a map with default value comming from given config or overidden by user params.
  : Caller will use it as $max?keyname to retrieve $conf?max_keyname or max_keyname parameter
-
- : @return a map with default values to use in the application.
+ : map will be populated by  keyname_info entries so we can display overriden param.
+ : @return a map with default or overriden values to use in the application.
 :)
 declare function app:defaults() as map(*){
     map:entry("max", map:merge(
         for $key in map:keys($app:conf?default)
-            let $mapkey:=replace($key, "max_", "")
-            let $mapvalue:= xs:double(try{ xs:double( request:get-parameter($key, "") ) }catch * {$app:conf?default($key)})
-            return map:entry($mapkey, $mapvalue)
+            let $map-max-key:=replace($key, "max_", "")
+            let $map-info-key:=$map-max-key||"_info"
+            let $param := try{ xs:double( request:get-parameter($key, "") ) }catch * { () }
+            let $conf := xs:double($app:conf?default($key))
+            let $mapinfo:= if( exists($param) and ( $param != $conf)) then <mark title="overridden by user : default conf is {$conf}">{$param}</mark> else $conf
+            let $mapvalue:= if( exists($param) ) then $param else $conf
+            return ( map:entry($map-max-key, $mapvalue), map:entry($map-info-key, $mapinfo))
         )
     )
 };
@@ -150,6 +154,7 @@ declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*
 
 declare %templates:wrap function app:form($node as node(), $model as map(*), $identifiers as xs:string*) {
     let $max := app:defaults()("max")
+    let $params :=  for $p in request:get-parameter-names()[.!="identifiers"] return <input type="hidden" name="{$p}" value="{request:get-parameter($p,' ')}"/>
     return
     (
     <div>
@@ -163,9 +168,9 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
                 <li>Main catalogs<ul>{ for $cat in $app:conf?catalogs?* where $cat?main_cat return <li><b>{$cat?cat_name}</b>&#160;{parse-xml("<span>"||$cat?description||"</span>")}</li>}</ul></li>
                 <li>Additionnal catalogs (use toggle button in the menu to get result tables)<ul>{ for $cat in $app:conf?catalogs?* where not($cat?main_cat) return <li><b>{$cat?cat_name}</b>&#160;{parse-xml("<span>"||$cat?description||"</span>")}</li>}</ul></li>
             </ul>
-            Each query is performed within {$max?dist_as}&apos; of the Science Target.
+            Each query is performed within {$max?dist_as_info}&apos; of the Science Target.
             A magnitude filter is applied on every Fringe Tracker Targets according to the best limits offered in P110
-            for <b>UT (MACAO) OR AT (NAOMI)</b>  respectively <b>( K &lt; {$max?magK_UT} AND V &lt; {$max?magV} ) OR ( K &lt; {$max?magK_AT} AND R&lt;{$max?magR} )</b>.
+            for <b>UT (MACAO) OR AT (NAOMI)</b>  respectively <b>( K &lt; {$max?magK_UT_info} AND V &lt; {$max?magV_info} ) OR ( K &lt; {$max?magK_AT_info} AND R&lt;{$max?magR_info} )</b>.
             When missing, the V and R magnitudes are computed from the Gaia G, Grb and Grp magnitudes.
             The user must <b>refine its target selection</b> to take into account <a href="https://www.eso.org/sci/facilities/paranal/instruments/gravity/inst.html">VLTI Adaptive Optics specifications</a> before we offer a configuration selector in a future release.
         </p>
@@ -177,7 +182,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
                 <li>Please <a href="http://www.jmmc.fr/feedback">fill a report</a> for any question or remark.</li>
             </ul>
         </p>
-        <form>
+        <form>{$params}
             <div class="p-3 input-group mb-3 ">
                 <input type="text" class="form-control" placeholder="Science identifiers (comma separated)" aria-label="Science identifiers (comma separated)" aria-describedby="b2"
                 id="identifiers" name="identifiers" value="{$identifiers}" required=""/>

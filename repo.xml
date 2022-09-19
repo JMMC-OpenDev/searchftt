@@ -12,7 +12,22 @@
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
   <changelog xmlns="">
-     <change version="1.2">
+     <change version="1.3">
+      <ul>
+        <li>User can override default configuration limits using next parameter list:
+          <ul>
+            <li>max_dist_as</li>
+            <li>max_magK_UT</li>
+            <li>max_magK_AT</li>
+            <li>max_magV</li>
+            <li>max_magR</li>
+            <li>eg. <a href="index.html?max_dist_as=40&amp;max_magK_UT=12&amp;max_magK_AT=11&amp;max_magV=16&amp;max_magR=13.5">try with your parameters...</a></li>
+            <li>( the number maximum of return targets may also be changed using max_rec )</li>
+          </ul>
+        </li>
+      </ul>
+    </change>
+    <change version="1.2">
       <ul>
         <li>Add new catalogs as new main ones (old are hidden by default):
           <ul>
