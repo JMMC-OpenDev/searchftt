@@ -22,7 +22,7 @@
             <li>max_magV</li>
             <li>max_magR</li>
             <li>eg. <a href="index.html?max_dist_as=40&amp;max_magK_UT=12&amp;max_magK_AT=11&amp;max_magV=16&amp;max_magR=13.5">try with your parameters...</a></li>
-            <li>( the number maximum of return targets may also be changed using max_rec )</li>
+            <li>( the maximum number of targets returned may also be changed using max_rec )</li>
           </ul>
         </li>
       </ul>
@@ -38,7 +38,7 @@
         <li>Fix catalog's epochs and build more accurate queries.</li>
         <li>Simbad search do not hide anymore the science star in the result table when compatible with mag filters.</li>
         <li>Enable table sortering by any column.</li>
-        <li>iTechnival - refactor a generic code using a json config for default constraints and various catalogs.</li>
+        <li>Technical - refactor a generic code using a json config for default constraints and various catalogs.</li>
       </ul>
     </change>
     <change version="1.1.2">
