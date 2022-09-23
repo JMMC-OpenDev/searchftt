@@ -4,6 +4,13 @@ xquery version "3.1";
  :
  : @author JMMC Tech Group
  : @see https://www.jmmc.fr
+
+
+ : TODO
+ : - use RV convertion from G in SIMBAD also
+ : - given Simbad link by coordinateds if it is coordinates
+ : - add a toggle that hides sources without results
+ : - TODO csv
  :)
 
 (: Module for app-specific template functions :)
@@ -30,6 +37,29 @@ declare variable $app:json-conf :='{
     "samestar-dist_deg" : 2.78E-4,
     "samestar-dist_as" : 1,
     "catalogs":{
+        "simcat": {
+            "cat_name":"SIMBAD_CAT",
+            "main_cat":true,
+            "description": "SIMBADTBD",
+            "tap_endpoint": "http://simbad.u-strasbg.fr/simbad/sim-tap/sync",
+            "tap_format" : "",
+            "tap_viewer" : "",
+            "simbad_prefix_id" : "",
+            "source_id": "basic.main_id",
+            "epoch"   : 2000,
+            "ra"      : "basic.ra",
+            "dec"     : "basic.dec",
+            "pmra"    : "basic.pmra",
+            "pmdec"   : "basic.pmdec",
+            "mag_k"   : "allfluxes.K",
+            "mag_g"   : "allfluxes.G",
+            "mag_bp"  : "",
+            "mag_rp"  : "",
+            "mag_v"  : "allfluxes.V",
+            "mag_r"  : "allfluxes.R",
+            "detail"      : { "otype_txt":"otype_txt" },
+            "from"    : "basic JOIN allfluxes ON oid=oidref"
+        },
         "gdr2ap": {
             "cat_name":"GDR2AP",
             "main_cat":false,
@@ -141,7 +171,7 @@ declare function app:defaults() as map(*){
 };
 
 declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*), $identifiers as xs:string*) {
-    let $toggle-classes := map{ "extcats" : "extended catalogs", "extcols" : "extended columns", "extquery" : "queries", "extdebug" : "debug", "exttable" : "hidden table" }
+    let $toggle-classes := map{ "extcats" : "extended catalogs", "extcols" : "extended columns", "extquery" : "queries", "exttable" : "hide table", "extorphan" : "hide orphan", "extdebug" : "debug" }
     return
         <li class="nav-link">{
             map:for-each( $toggle-classes, function ($k, $label) {
@@ -152,7 +182,8 @@ declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*
         }</li>[exists($identifiers)]
 };
 
-declare %templates:wrap function app:form($node as node(), $model as map(*), $identifiers as xs:string*) {
+
+declare %templates:wrap function app:form($node as node(), $model as map(*), $identifiers as xs:string*, $format as xs:string*) {
     let $max := app:defaults()("max")
     let $params :=  for $p in request:get-parameter-names()[.!="identifiers"] return <input type="hidden" name="{$p}" value="{request:get-parameter($p,' ')}"/>
     return
@@ -222,6 +253,9 @@ declare function app:resolve-by-name($name-or-coords) {
         return <s><name>{normalize-space($name-or-coords)}</name><ra>{$t[1]}</ra><dec>{$t[2]}</dec><pmra>0.0</pmra><pmdec>0.0</pmdec></s>
 };
 
+
+
+
 declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) {
 
     let $fov_deg := 3 * $max?dist_as div 3600
@@ -237,16 +271,17 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
                     <li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto">{app:search-simbad($id, $max, $s)}</div></li>
                     {
                         for $cat in $app:conf?catalogs?* order by $cat?main_cat descending return
-                            <li class="list-group-item d-flex justify-content-between align-items-start {if($cat?main_cat) then () else "extcats d-none"}"><div class="ms-2 me-auto">{app:search($id, $max, $s, $cat)}</div></li>
-
+                            <li class="list-group-item d-flex justify-content-between align-items-start {if($cat?main_cat) then () else "extcats d-none"}">
+                                <div class="ms-2 me-auto">{app:search($id, $max, $s, $cat)}</div>
+                            </li>
                     }
                 </ul>
             else
                 <div>Can&apos;t get position from Simbad, please check your identifier.</div>
         let $state := if(exists($info//table)) then "success" else if(exists($s/ra)) then "warning" else "danger"
-        let $ff :=()
+        let $orphan := if (exists($info//table)) then () else "extorphan"
         return
-            <div><ul class="p-1 list-group">
+            <div class="{$orphan}"><ul class="p-1 list-group">
                 <li class="list-group-item list-group-item-{$state}">
                     <div class="">
                         <div class="row">
@@ -263,7 +298,7 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
                                     )
                             }
                             </div>
-                                { if (exists($s/ra)) then
+                                { if (count($identifiers) < 100 and exists($s/ra)) then
                                     <div class="col d-flex flex-row-reverse">
                                         <div id="aladin-lite-div{$pos}" style="width:200px;height:200px;"></div>
                                         <script type="text/javascript">
@@ -281,6 +316,90 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
             </ul></div>
     return
         (<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>, $lis)
+};
+
+declare %templates:wrap function app:bulk-form($node as node(), $model as map(*), $identifiers as xs:string*, $format as xs:string*) {
+    let $max := app:defaults()("max")
+    let $params :=  for $p in request:get-parameter-names()[.!="identifiers"] return <input type="hidden" name="{$p}" value="{request:get-parameter($p,' ')}"/>
+    return
+    (
+    <div>
+        <h1>Bulk form!</h1>
+        <p>This new form provide an efficient way to query a large number of targets.</p>
+        <form method="post">{$params}
+            <div class="p-3 input-group mb-3 ">
+                <input type="text" class="form-control" placeholder="Science identifiers or coordinates (comma separated), e.g : 0 0, 4.321 6.543, HD123, HD234 " aria-label="Science identifiers (comma separated)" aria-describedby="b2"
+                id="identifiers" name="identifiers" value="{$identifiers}" required=""/>
+                <button class="btn btn-outline-secondary" type="submit" id="b2"><i class="bi bi-search"/></button>
+            </div>
+        </form>
+    </div>
+    ,
+    if (exists($identifiers)) then (
+        app:searchftt-bulk-list($identifiers, $max),
+        <script type="text/javascript">
+        $(document).ready(function() {{
+        $('.datatable').DataTable( {{
+            "paging": false,"searching":false,"info": false,"order": []
+        }});
+
+        }});
+        </script>
+
+        ) else ()
+    )
+};
+
+declare function app:searchftt-bulk-list($identifiers as xs:string, $max as map(*) ) {
+
+    let $fov_deg := 3 * $max?dist_as div 3600
+
+    let $ids := $identifiers ! tokenize(., ",") ! tokenize(., ";")
+
+    let $map := for $id in $ids return map{$id: app:resolve-by-name($id)}
+    let $cols := $map?*[1]/* ! name(.)
+    let $th := <tr> {$cols ! <th>{.}</th>}</tr>
+    let $trs := for $star in $map?*
+        return <tr> {for $col in $cols return <td>{data($star/*[name(.)=$col])}</td> } </tr>
+
+    let $table := <table class="table table-light datatable">
+        <thead>{$th}</thead>
+        {$trs}
+        </table>
+    let $votable := app:table2votable($table, "targets")
+    let $targets :=<div><h3>Your { count($table//tr[td]) } targets </h3>{$table}</div>
+
+    let $res-tables :=  for $cat in $app:conf?catalogs?* where $cat?cat_name="SIMBAD_CAT" order by $cat?main_cat descending
+        return
+            app:bulk-search($votable, $max, $cat)
+
+    return
+        (<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>
+        , $res-tables
+        , $targets
+        (: ,serialize($votable) :)
+        )
+};
+
+declare function app:table2votable($table, $name){
+    <VOTABLE xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.4" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/v1.3">
+        <RESOURCE type="input">
+            <TABLE name="{$name}">
+                {
+                    let $tds := ($table//*:tr[*:td])[1]/*:td
+                    for $col at $pos in $table//*:th
+                        let $type := try{ let $a := xs:double($tds[$pos]) return "double"} catch * {"char"}
+                        let $arraysize := if($type="char") then "*" else "1"
+                        return <FIELD datatype="{$type}" arraysize="{$arraysize}" name="my_{$col}"/>
+                }
+                <DATA>
+                    <TABLEDATA>
+                        { for $tr in $table//*:tr[*:td] return <TR>{for $td in $tr/*:td return <TD>{data($td)}</TD>}</TR> }
+                    </TABLEDATA>
+                </DATA>
+            </TABLE>
+        </RESOURCE>
+    </VOTABLE>
 };
 
 declare function app:search-simbad($id, $max, $s) {
@@ -310,9 +429,9 @@ declare function app:search-simbad($id, $max, $s) {
                     for $tr in $votable//*:TABLEDATA/* return
                         <tr>{
                             let $main_id := $tr/*[1] (: id alway must be requested as first param in the query :)
-                            let $target_link := <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($main_id)}" target="_new_simbad">{replace($main_id," ","&#160;")}</a>
+                            let $target_link := <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($main_id)}" target="_blank">{replace($main_id," ","&#160;")}</a>
                             let $getstar-url := "https://apps.jmmc.fr/~sclws/getstar/sclwsGetStarProxy.php?star="||encode-for-uri($main_id)
-                            let $getstar-link := <a href="{$getstar-url}" target="{$main_id}"><i class="bi bi-box-arrow-up-right"></i></a>
+                            let $getstar-link := <a href="{$getstar-url}" target="_blank"><i class="bi bi-box-arrow-up-right"></i></a>
                             return
                                 (
                                     <td>{$target_link}</td>,
@@ -361,8 +480,9 @@ declare function app:searchftt-simbad-query($identifier, $max) as xs:string{
 
 declare function app:search($id, $max, $s, $cat) {
 	let $query := app:searchftt-query($id, $max, $cat)
-    let $query-code := <pre class="extquery d-none"><br/>{data($query)}</pre>
     let $votable := jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $max?rec, $cat?tap_format)
+    let $votable-url := jmmc-tap:tap-adql-query-uri($cat?tap_endpoint,$query, $max?rec, $cat?tap_format)
+    let $query-code := <div class="extquery d-none"><pre><br/>{data($query)}</pre><a target="_blank" href="{$votable-url}">get original votable</a></div>
 	let $src := if ($cat?tap_viewer)  then <a class="extquery d-none" href="{$cat?tap_viewer||encode-for-uri($query)}">View original votable</a> else ()
     return
 
@@ -403,7 +523,7 @@ declare function app:search($id, $max, $s, $cat) {
                                 let $dec := $tr/*[index-of($field_names, "dec")]
                                 return <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$simbad_id}">{replace($simbad_id," ","&#160;")}</a>
                             let $getstar-url := "https://apps.jmmc.fr/~sclws/getstar/sclwsGetStarProxy.php?star="||encode-for-uri($simbad/name)
-                            let $getstar-link := if ($simbad/ra) then <a href="{$getstar-url}" target="{$simbad/name}"><i class="bi bi-box-arrow-up-right"></i></a>  else "-"
+                            let $getstar-link := if ($simbad/ra) then <a href="{$getstar-url}" target="_blank"><i class="bi bi-box-arrow-up-right"></i></a>  else "-"
                             return
                                 (
                                     <td>{$target_link}</td>,
@@ -414,7 +534,9 @@ declare function app:search($id, $max, $s, $cat) {
                         }</tr>
                 }
             </table>
-            <span class="extdebug d-none">{serialize($votable//*:COOSYS[1])}</span> {$query-code} {$src}
+
+            <span class="extdebug d-none">{serialize($votable//*:COOSYS[1])}</span> {$query-code}
+            {$src}
         </div>
     else
         <div>
@@ -425,28 +547,50 @@ declare function app:search($id, $max, $s, $cat) {
                 else
                     <span>Sorry, no fringe traking star found for <b>{$s/name/text()} in {$cat?cat_name}</b>.</span>
             }
-            {$query-code} {$src}
+            {$query-code}
+            {$src}
         </div>
 };
 
-declare function app:searchftt-query($identifier, $max, $cat as map(*)){
+declare function app:bulk-search($input-votable, $max, $cat) {
+	let $query := app:searchftt-query($input-votable, $max, $cat)
+    let $query-code := <div class="extquery d-none"><pre><br/>{data($query)}</pre></div>
+    let $max-rec := $max?rec * count($input-votable//*:TR) * 10
+    let $votable := jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $input-votable, $max-rec, $cat?tap_format)
+    return
+        (<h3>{$cat?cat_name}</h3>
+        ,<table class="table table-light table-bordered datatable {if($cat?main_cat) then () else "extcats d-none"} ">
+            <thead><tr>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{data($field/@name)}</th>}</tr></thead>
+            {for $trs in $votable//*:TR return <tr>{for $td in $trs/*:TD return <td>{data($td)}</td>}</tr>}
+        </table>
+        (: ,serialize($votable) :)
+        ,$query-code)
 
-    let $s := app:resolve-by-name($identifier)
-    let $ra := $s/ra
-    let $dec := $s/dec
-    let $pmra := try{ xs:double($s/pmra) } catch * {0}
-    let $pmdec := try{ xs:double($s/pmdec) } catch * {0}
+};
+
+declare function app:searchftt-query($identifier-or-votable, $max, $cat as map(*)){
+    let $votname := if($identifier-or-votable instance of node()) then $identifier-or-votable//*:TABLE/@name else ()
+    let $s := if($votname)  then $votname else app:resolve-by-name($identifier-or-votable)
+    let $ra := if($votname) then $votname||".my_ra" else $s/ra
+    let $dec := if($votname) then $votname||".my_dec" else $s/dec
+    let $pmra := if($votname) then $votname||".my_pmra" else try{ xs:double($s/pmra) } catch * {0}
+    let $pmdec := if($votname) then $votname||".my_pmdec" else try{ xs:double($s/pmdec) } catch * {0}
+    let $upload-from := if($votname) then "TAP_UPLOAD."||$votname|| " as " ||$votname||", " else ()
+    let $science-name-col := if($votname) then $votname||".my_name as science, " else ()
+    let $order-by := if($votname) then "science," else ()
 
     (: We could have built query with COALESCE to replace missing pmra by 0, but:
         GAVO does not support it inside a formulae and VizieR forbid it  :(
     :)
     let $distance_J2000 := <dist_as>DISTANCE(
-        POINT( 'ICRS', {$cat?ra} - ( ({$cat?epoch}-2000.0) * {$cat?pmra} ) / 3600000.0, {$cat?dec} - ( ( {$cat?epoch}-2000.0) * {$cat?pmdec} ) / 3600000.0  ),
-        POINT( 'ICRS', {$ra}, {$dec} )
+        POINT( 'ICRS', {$cat?ra} - ( ({$cat?epoch}-2000.0) * {$cat?pmra} ) / 3600000.0, {$cat?dec} - ( ( {$cat?epoch}-2000.0) * {$cat?pmdec} ) / 3600000.0  )
+        ,POINT( 'ICRS', {$ra}, {$dec} )
         )*3600.0 as j2000_dist_as</dist_as>
 
-    let $distance_catalog :=
-        <dist_as>DISTANCE( POINT('ICRS', {$cat?ra}, {$cat?dec}), POINT('ICRS', {$ra}-((2000.0-{$cat?epoch})*{$pmra})/3600000.0, {$dec}-((2000.0-{$cat?epoch})*{$pmdec})/3600000.0 ))*3600.0 as cat_dist_as</dist_as>
+    let $distance_catalog := <dist_as>DISTANCE(
+        POINT('ICRS', {$cat?ra}, {$cat?dec})
+        ,POINT('ICRS', {$ra}-((2000.0-{$cat?epoch})*{$pmra})/3600000.0, {$dec}-((2000.0-{$cat?epoch})*{$pmdec})/3600000.0 )
+        )*3600.0 as cat_dist_as</dist_as>
 
     let $vmag := $cat?mag_v
     let $rmag := $cat?mag_r
@@ -482,6 +626,7 @@ declare function app:searchftt-query($identifier, $max, $cat as map(*)){
 
     let $query := <text>
     SELECT
+        {$science-name-col}
         {$cat?source_id} as source_id,
         {$distance_J2000},
         {$distance_catalog},
@@ -490,13 +635,13 @@ declare function app:searchftt-query($identifier, $max, $cat as map(*)){
         {$cat?epoch} as epoch,
         {$mags}
     FROM
-        {$from}
+        {$upload-from} {$from}
     WHERE
         CONTAINS( POINT('ICRS', {$cat?ra}, {$cat?dec}), CIRCLE('ICRS', {$ra_in_cat}, {$dec_in_cat}, {$max?dist_as}/3600.0) ) = 1
             AND
         {$max-mag-filters}
     ORDER BY
-        j2000_dist_as
+        {$order-by} j2000_dist_as
     </text>
     return
         $query
