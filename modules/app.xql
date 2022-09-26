@@ -75,6 +75,7 @@ declare variable $app:json-conf :='{
             "detail"  : { },
             "from"    : "gaia.dr2light JOIN gdr2ap.main ON gaia.dr2light.source_id=gdr2ap.main.source_id"
         },"esagaia3": {
+            "enable" : true,
             "cat_name"    : "Gaia DR3",
             "main_cat":true,
             "description" : "Gaia DR3 catalogues and cross-matched catalogues though <a href=&apos;https://www.cosmos.esa.int/web/gaia-users/archive&apos;>ESA archive center</a>.",
@@ -246,8 +247,6 @@ declare function app:resolve-by-name($name-or-coords) {
 };
 
 
-
-
 declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) {
 
     let $fov_deg := 3 * $max?dist_as div 3600
@@ -308,6 +307,82 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
             </ul></div>
     return
         (<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>, $lis)
+};
+
+declare function app:search($id, $max, $s, $cat) {
+   	let $log := util:log("info", "searching single ftt in "||$cat?cat_name||" ...")
+	let $query := app:build-query($id, (), $max, $cat)
+    let $votable := try{jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $max?rec, $cat?tap_format) }catch * {util:log("error", serialize($err:value)), $err:value}
+    let $votable-url := jmmc-tap:tap-adql-query-uri($cat?tap_endpoint,$query, $max?rec, $cat?tap_format)
+    let $query-code := <div class="extquery d-none"><pre><br/>{data($query)}</pre><a target="_blank" href="{$votable-url}">get original votable</a></div>
+	let $src := if ($cat?tap_viewer)  then <a class="extquery d-none" href="{$cat?tap_viewer||encode-for-uri($query)}">View original votable</a> else ()
+    let $log := util:log("info", "done")
+    return
+
+    if(exists($votable//*:TABLEDATA/*)) then
+        let $detail_cols := for $e in (array:flatten($app:conf?extended-cols), $cat?detail?*) return lower-case($e) (: values correspond to column names given by AS ...:)
+        let $field_names := for $e in $votable//*:FIELD/@name return lower-case($e)
+        let $source_id_idx := index-of($field_names, "source_id")
+        let $tr-count := count($votable//*:TABLEDATA/*)
+        return
+        <div class="table-responsive">
+            <table class="table table-light datatable" data-found-targets="{$tr-count}" data-src-targets="{$cat?cat_name}">
+                <thead><tr>
+                    {for $f at $cpos in $votable//*:FIELD return
+                        if ($cpos != $source_id_idx) then
+                            let $title := if("cat_dist_as"=$f/@name) then "Distance computed moving science star to the catalog epoch using its proper motion"
+                                else if("j2000_dist_as"=$f/@name) then "Distance computed moving candidates to J2000"
+                                else if("today_dist_as"=$f/@name) then "Distance computed moving science star and candidates to current year epoch"
+                                else $f/*:DESCRIPTION
+                            let $name := if(starts-with($f/@name, "computed_")) then replace($f/@name, "computed_", "") else data($f/@name)
+                            let $name :=  replace($name, "j_2mass", "2MASS&#160;J")
+                            let $name :=if (ends-with($name, "_as")) then replace($name, "_as", "") else data($name)
+                            let $unit :=if (ends-with($f/@name, "_as")) then "[arcsec]" else if(starts-with($f/@name, "computed_")) then "(computed)" else if (data($f/@unit)) then "["|| $f/@unit ||"]" else ()
+
+                            return
+                            <th title="{$title}">{if($field_names[$cpos]=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()}{$name} &#160; {$unit}</th>
+                        else
+                            <th><span class="badge rounded-pill bg-dark">{$tr-count}</span>&#160;Simbad&#160;link&#160;for&#160;<u>{$cat?cat_name}</u></th>
+                    }
+                    <th>GetStar</th>
+                </tr></thead>
+                {
+                    for $tr in $votable//*:TABLEDATA/* return
+                        <tr>{
+                            let $simbad_id := $cat?simbad_prefix_id||$tr/*[$source_id_idx]
+                            let $simbad := jmmc-simbad:resolve-by-name($simbad_id)
+                            let $target_link := if ($simbad/ra) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
+                                let $ra := $tr/*[index-of($field_names, "ra")]
+                                let $dec := $tr/*[index-of($field_names, "dec")]
+                                return <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$simbad_id}">{replace($simbad_id," ","&#160;")}</a>
+                            let $getstar-url := "https://apps.jmmc.fr/~sclws/getstar/sclwsGetStarProxy.php?star="||encode-for-uri($simbad/name)
+                            let $getstar-link := if ($simbad/ra) then <a href="{$getstar-url}" target="_blank"><i class="bi bi-box-arrow-up-right"></i></a>  else "-"
+                            return
+                                (
+                                    <td>{$target_link}</td>,
+                                    for $td at $cpos in $tr/* where $cpos != 1 return
+                                        element {"td"} {attribute {"class"} {if( $field_names[$cpos]=$detail_cols ) then "d-none extcols table-primary" else ()},try { let $d := xs:double($td) return format-number($d, "0.###") } catch * { if(string-length($td)>1) then data($td) else "-" }},
+                                    <td>{$getstar-link}<!--{$getstar-votable//*:TABLEDATA/*:TR/*:TD[121]/text()}--></td>
+                                )
+                        }</tr>
+                }
+            </table>
+
+            <span class="extdebug d-none">{serialize($votable//*:COOSYS[1])}</span> {$query-code}
+            {$src}
+        </div>
+    else
+        <div>
+            {
+                if ( $votable//*:INFO[@name="QUERY_STATUS" and @value="ERROR"] ) then let $anchor := "error-"||util:uuid() return
+                    (<a id="{$anchor}" href="#{$anchor}" class="text-danger" onclick='$(".extdebug").toggleClass("d-none");'>Sorry, an error occured executing the query. {$votable//*:INFO[@name='QUERY_STATUS' and @value='ERROR']}</a>
+                    ,<code class="extdebug d-none"><br/>{serialize($votable)}</code>)
+                else
+                    <span>Sorry, no fringe traking star found for <b>{$s/name/text()} in {$cat?cat_name}</b>.</span>
+            }
+            {$query-code}
+            {$src}
+        </div>
 };
 
 declare %templates:wrap function app:bulk-form($node as node(), $model as map(*), $identifiers as xs:string*, $format as xs:string*) {
@@ -373,113 +448,17 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
         )
 };
 
-declare function app:table2votable($table, $name){
-    <VOTABLE xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.4" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/v1.3">
-        <RESOURCE type="input">
-            <TABLE name="{$name}">
-                {
-                    let $tds := ($table//*:tr[*:td])[1]/*:td
-                    for $col at $pos in $table//*:th
-                        let $type := try{ let $a := xs:double($tds[$pos]) return "double"} catch * {"char"}
-                        let $arraysize := if($type="char") then "*" else "1"
-                        return <FIELD datatype="{$type}" arraysize="{$arraysize}" name="my_{$col}"/>
-                }
-                <DATA>
-                    <TABLEDATA>
-                        { for $tr in $table//*:tr[*:td] return <TR>{for $td in $tr/*:td return <TD>{data($td)}</TD>}</TR> }
-                    </TABLEDATA>
-                </DATA>
-            </TABLE>
-        </RESOURCE>
-    </VOTABLE>
-};
-
-declare function app:search($id, $max, $s, $cat) {
-   	let $log := util:log("info", "searching single ftt in "||$cat?cat_name||" ...")
-	let $query := app:searchftt-query($id, (), $max, $cat)
-    let $votable := try{jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $max?rec, $cat?tap_format) }catch * {util:log("error", serialize($err:value))}
-    let $votable-url := jmmc-tap:tap-adql-query-uri($cat?tap_endpoint,$query, $max?rec, $cat?tap_format)
-    let $query-code := <div class="extquery d-none"><pre><br/>{data($query)}</pre><a target="_blank" href="{$votable-url}">get original votable</a></div>
-	let $src := if ($cat?tap_viewer)  then <a class="extquery d-none" href="{$cat?tap_viewer||encode-for-uri($query)}">View original votable</a> else ()
-    let $log := util:log("info", "done")
-    return
-
-    if(exists($votable//*:TABLEDATA/*)) then
-        let $detail_cols := for $e in (array:flatten($app:conf?extended-cols), $cat?detail?*) return lower-case($e) (: values correspond to column names given by AS ...:)
-        let $field_names := for $e in $votable//*:FIELD/@name return lower-case($e)
-        let $source_id_idx := index-of($field_names, "source_id")
-        let $tr-count := count($votable//*:TABLEDATA/*)
-        return
-        <div class="table-responsive">
-            <table class="table table-light datatable" data-found-targets="{$tr-count}" data-src-targets="{$cat?cat_name}">
-                <thead><tr>
-                    {for $f at $cpos in $votable//*:FIELD return
-                        if ($cpos != $source_id_idx) then
-                            let $title := if("cat_dist_as"=$f/@name) then "Distance computed moving science star to the catalog epoch using its proper motion"
-                                else if("j2000_dist_as"=$f/@name) then "Distance computed moving candidates to J2000"
-                                else if("today_dist_as"=$f/@name) then "Distance computed moving science star and candidates to current year epoch"
-                                else $f/*:DESCRIPTION
-                            let $name := if(starts-with($f/@name, "computed_")) then replace($f/@name, "computed_", "") else data($f/@name)
-                            let $name :=  replace($name, "j_2mass", "2MASS&#160;J")
-                            let $name :=if (ends-with($name, "_as")) then replace($name, "_as", "") else data($name)
-                            let $unit :=if (ends-with($f/@name, "_as")) then "[arcsec]" else if(starts-with($f/@name, "computed_")) then "(computed)" else if (data($f/@unit)) then "["|| $f/@unit ||"]" else ()
-
-                            return
-                            <th title="{$title}">{if($field_names[$cpos]=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()}{$name} &#160; {$unit}</th>
-                        else
-                            <th><span class="badge rounded-pill bg-dark">{$tr-count}</span>&#160;Simbad&#160;link&#160;for&#160;<u>{$cat?cat_name}</u></th>
-                    }
-                    <th>GetStar</th>
-                </tr></thead>
-                {
-                    for $tr in $votable//*:TABLEDATA/* return
-                        <tr>{
-                            let $simbad_id := $cat?simbad_prefix_id||$tr/*[$source_id_idx]
-                            let $simbad := jmmc-simbad:resolve-by-name($simbad_id)
-                            let $target_link := if ($simbad/ra) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
-                                let $ra := $tr/*[index-of($field_names, "ra")]
-                                let $dec := $tr/*[index-of($field_names, "dec")]
-                                return <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$simbad_id}">{replace($simbad_id," ","&#160;")}</a>
-                            let $getstar-url := "https://apps.jmmc.fr/~sclws/getstar/sclwsGetStarProxy.php?star="||encode-for-uri($simbad/name)
-                            let $getstar-link := if ($simbad/ra) then <a href="{$getstar-url}" target="_blank"><i class="bi bi-box-arrow-up-right"></i></a>  else "-"
-                            return
-                                (
-                                    <td>{$target_link}</td>,
-                                    for $td at $cpos in $tr/* where $cpos != 1 return
-                                        element {"td"} {attribute {"class"} {if( $field_names[$cpos]=$detail_cols ) then "d-none extcols table-primary" else ()},try { let $d := xs:double($td) return format-number($d, "0.###") } catch * { if(string-length($td)>1) then data($td) else "-" }},
-                                    <td>{$getstar-link}<!--{$getstar-votable//*:TABLEDATA/*:TR/*:TD[121]/text()}--></td>
-                                )
-                        }</tr>
-                }
-            </table>
-
-            <span class="extdebug d-none">{serialize($votable//*:COOSYS[1])}</span> {$query-code}
-            {$src}
-        </div>
-    else
-        <div>
-            {
-                if ( $votable//*:INFO[@name="QUERY_STATUS" and @value="ERROR"] ) then let $anchor := "error-"||util:uuid() return
-                    (<a id="{$anchor}" href="#{$anchor}" class="text-danger" onclick='$(".extdebug").toggleClass("d-none");'>Sorry, an error occured in the query.</a>
-                    ,<code class="extdebug d-none"><br/>{serialize($votable)}</code>)
-                else
-                    <span>Sorry, no fringe traking star found for <b>{$s/name/text()} in {$cat?cat_name}</b>.</span>
-            }
-            {$query-code}
-            {$src}
-        </div>
-};
 
 declare function app:bulk-search($input-votable, $max, $cat) {
 	let $log := util:log("info", "searching bulk ftt in "||$cat?cat_name||" ...")
-    let $query := app:searchftt-query((), $input-votable, $max, $cat)
+    let $query := app:build-query((), $input-votable, $max, $cat)
     let $query-code := <div class="extquery d-none"><pre><br/>{data($query)}</pre></div>
     let $max-rec := $max?rec * count($input-votable//*:TR) * 10
     let $votable := <error>IGNORED</error>
-    let $votable := try{jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $input-votable, $max-rec, $cat?tap_format)}catch * {<a><error>{$err:description}</error></a>}
+    let $votable := try{jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $input-votable, $max-rec, $cat?tap_format)}catch * {<a><error>{$err:description}</error>{$err:value}</a>}
 
     let $log := util:log("info", "done")
-    let $table := if($votable/error)
+    let $table := if($votable/error or $votable//*:INFO[@name="QUERY_STATUS" and @value="ERROR"])
          then
             <div class="alert alert-danger" role="alert">
                 Error trying to get votable.<br/>
@@ -500,7 +479,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
         </div>
 };
 
-declare function app:searchftt-query($identifier, $votable, $max, $cat as map(*)){
+declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $votname := if($votable) then $votable//*:TABLE/@name else ()
     let $s := if($votname)  then $votname else app:resolve-by-name($identifier)
     let $ra := if($votname) then $votname||".my_ra" else $s/ra
@@ -594,4 +573,25 @@ declare function app:searchftt-query($identifier, $votable, $max, $cat as map(*)
         $query
 };
 
+
+declare function app:table2votable($table, $name){
+    <VOTABLE xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.4" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/v1.3">
+        <RESOURCE type="input">
+            <TABLE name="{$name}">
+                {
+                    let $tds := ($table//*:tr[*:td])[1]/*:td
+                    for $col at $pos in $table//*:th
+                        let $type := try{ let $a := xs:double($tds[$pos]) return "double"} catch * {"char"}
+                        let $arraysize := if($type="char") then "*" else "1"
+                        return <FIELD datatype="{$type}" arraysize="{$arraysize}" name="my_{$col}"/>
+                }
+                <DATA>
+                    <TABLEDATA>
+                        { for $tr in $table//*:tr[*:td] return <TR>{for $td in $tr/*:td return <TD>{data($td)}</TD>}</TR> }
+                    </TABLEDATA>
+                </DATA>
+            </TABLE>
+        </RESOURCE>
+    </VOTABLE>
+};
 
