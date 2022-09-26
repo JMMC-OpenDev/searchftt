@@ -4,13 +4,6 @@ xquery version "3.1";
  :
  : @author JMMC Tech Group
  : @see https://www.jmmc.fr
-
-
- : TODO
- : - use RV convertion from G in SIMBAD also
- : - given Simbad link by coordinateds if it is coordinates
- : - add a toggle that hides sources without results
- : - TODO csv
  :)
 
 (: Module for app-specific template functions :)
@@ -38,7 +31,7 @@ declare variable $app:json-conf :='{
     "samestar-dist_as" : 1,
     "catalogs":{
         "simcat": {
-            "cat_name":"SIMBAD_CAT",
+            "cat_name":"Simbad",
             "main_cat":true,
             "description": "SIMBADTBD",
             "tap_endpoint": "http://simbad.u-strasbg.fr/simbad/sim-tap/sync",
@@ -121,7 +114,7 @@ declare variable $app:json-conf :='{
             "mag_rp" : "gaia.phot_rp_mean_mag",
             "detail"      : { "tmass.h_m":"H_mag", "tmass_nb.angular_distance":"tmass_dist", "tmass.designation":"J_2MASS" },
             "from"        : "gaiadr2.gaia_source as gaia JOIN gaiadr2.tmass_best_neighbour as tmass_nb USING (source_id) JOIN gaiadr1.tmass_original_valid as tmass ON tmass.tmass_oid = tmass_nb.tmass_oid"
-        },"gsc":    {
+        },"gsc": {
             "cat_name"    : "GSC2",
             "main_cat":true,
             "description" : "<a href=&apos;https://cdsarc.cds.unistra.fr/viz-bin/cat/I/353&apos;>The Guide Star Catalogue, Version 2.4.2 (2020)</a>",
@@ -144,7 +137,7 @@ declare variable $app:json-conf :='{
             "mag_r"  : "rmag",
             "detail"      : { },
             "from"        : "I/353/gsc242"
-            }
+        }
     }
 }';
 
@@ -193,11 +186,10 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
         <p>This newborn tool is in its first version and is subject to various changes in its early development phase.</p>
         <h2>Underlying method:</h2>
         <p>
-            You can query one or several Science Targets. For each of them, Fringe Tracker Targets will be given using following research methods: <br/>
+            You can query one or several Science Targets. For each of them, suitable ringe Tracker Targets will be given using following research methods: <br/>
             <ul>
-                <li>Simbad for sources that are suitable for fringe tracking.</li>
                 <li>Main catalogs<ul>{ for $cat in $app:conf?catalogs?* where $cat?main_cat return <li><b>{$cat?cat_name}</b>&#160;{parse-xml("<span>"||$cat?description||"</span>")}</li>}</ul></li>
-                <li>Additionnal catalogs (use toggle button in the menu to get result tables)<ul>{ for $cat in $app:conf?catalogs?* where not($cat?main_cat) return <li><b>{$cat?cat_name}</b>&#160;{parse-xml("<span>"||$cat?description||"</span>")}</li>}</ul></li>
+                {if ( false() = $app:conf?catalogs?*?main_cat ) then <li>Additionnal catalogs (use toggle button in the menu to get result tables)<ul>{ for $cat in $app:conf?catalogs?* where not($cat?main_cat) return <li><b>{$cat?cat_name}</b>&#160;{parse-xml("<span>"||$cat?description||"</span>")}</li>}</ul></li> else ()}
             </ul>
             Each query is performed within {$max?dist_as_info}&apos; of the Science Target.
             A magnitude filter is applied on every Fringe Tracker Targets according to the best limits offered in P110
@@ -207,7 +199,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
         </p>
         <p>
             <ul>
-                <li>Enter comma separated names ( resolved by <a href="http://simbad.u-strasbg.fr">Simbad</a>) or coordinates (RA +/-DEC in degrees J2000), in the TextBox below.</li>
+                <li>Enter comma separated names ( SearchFTT will try to resolve it using <a href="http://simbad.u-strasbg.fr">Simbad</a> ) or coordinates (RA +/-DEC in degrees J2000), in the TextBox below.</li>
                 <li>Move your pointer to the column titles of the result tables to get the column descriptions.</li>
                 <li>To send a target to <a href="https://www.jmmc.fr/getstar">Aspro2</a> (already open), click on the icon in the <a href="https://www.jmmc.fr/getstar">GetStar</a> column, then press "Send Votable".</li>
                 <li>Please <a href="http://www.jmmc.fr/feedback">fill a report</a> for any question or remark.</li>
@@ -250,7 +242,7 @@ declare function app:resolve-by-name($name-or-coords) {
     else
         let $coord := $name-or-coords => replace( "\+", " +") => replace ("\-", " -")
         let $t := for $e in tokenize($coord, " ")[string-length(.)>0]  return $e
-        return <s><name>{normalize-space($name-or-coords)}</name><ra>{$t[1]}</ra><dec>{$t[2]}</dec><pmra>0.0</pmra><pmdec>0.0</pmdec></s>
+        return <s><position-only/><name>{normalize-space($name-or-coords)}</name><ra>{$t[1]}</ra><dec>{$t[2]}</dec><pmra>0.0</pmra><pmdec>0.0</pmdec></s>
 };
 
 
@@ -260,15 +252,15 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
 
     let $fov_deg := 3 * $max?dist_as div 3600
 
-    let $ids := $identifiers ! tokenize(., ",") ! tokenize(., ";")
+    let $ids := distinct-values($identifiers ! tokenize(., ",") ! tokenize(., ";"))
 
     let $lis :=
         for $id at $pos in $ids
         let $s := app:resolve-by-name($id)
+        let $simbad-link := if($s/position-only) then <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={encode-for-uri($id)}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec">{$id}</a> else <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}">{$id}</a>
         let $ra := $s/ra let $dec := $s/dec
         let $info := if(exists($s/ra))then
-                <ul class="list-group list-group-numberedaaaa">
-                    <li class="list-group-item d-flex justify-content-between align-items-start"><div class="ms-2 me-auto">{app:search-simbad($id, $max, $s)}</div></li>
+                <ul class="list-group">
                     {
                         for $cat in $app:conf?catalogs?* order by $cat?main_cat descending return
                             <li class="list-group-item d-flex justify-content-between align-items-start {if($cat?main_cat) then () else "extcats d-none"}">
@@ -285,7 +277,7 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
                 <li class="list-group-item list-group-item-{$state}">
                     <div class="">
                         <div class="row">
-                            <div class="col"><b><a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}">{$id}</a></b>
+                            <div class="col"><b>{$simbad-link}</b>
                             <br/>ICRS coord. [deg] (ep=J2000) : {$ra}&#160;{$dec}
                             <br/>Proper motions [mas/yr] : {$s/pmra}&#160;{$s/pmdec}
                             <br/>
@@ -350,11 +342,11 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
     )
 };
 
-declare function app:searchftt-bulk-list($identifiers as xs:string, $max as map(*) ) {
+declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map(*) ) {
 
     let $fov_deg := 3 * $max?dist_as div 3600
 
-    let $ids := $identifiers ! tokenize(., ",") ! tokenize(., ";")
+    let $ids := distinct-values($identifiers ! tokenize(., ",") ! tokenize(., ";"))
 
     let $map := for $id in $ids return map{$id: app:resolve-by-name($id)}
     let $cols := $map?*[1]/* ! name(.)
@@ -369,7 +361,7 @@ declare function app:searchftt-bulk-list($identifiers as xs:string, $max as map(
     let $votable := app:table2votable($table, "targets")
     let $targets :=<div><h3>Your { count($table//tr[td]) } targets </h3>{$table}</div>
 
-    let $res-tables :=  for $cat in $app:conf?catalogs?* where $cat?cat_name="SIMBAD_CAT" order by $cat?main_cat descending
+    let $res-tables :=  for $cat in $app:conf?catalogs?* (: where $cat?cat_name!="GSC2" :) order by $cat?main_cat descending
         return
             app:bulk-search($votable, $max, $cat)
 
@@ -377,7 +369,7 @@ declare function app:searchftt-bulk-list($identifiers as xs:string, $max as map(
         (<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>
         , $res-tables
         , $targets
-        (: ,serialize($votable) :)
+        ,<code class="extdebug d-none"><br/>{serialize($votable)}</code>
         )
 };
 
@@ -402,88 +394,14 @@ declare function app:table2votable($table, $name){
     </VOTABLE>
 };
 
-declare function app:search-simbad($id, $max, $s) {
-	let $query := app:searchftt-simbad-query($id,$max)
-    let $query-code := <pre class="extquery d-none"><br/>{data($query)}</pre>
-    let $votable := try{jmmc-tap:tap-adql-query($jmmc-tap:SIMBAD-SYNC, $query, $max?rec) } catch * {<error>{$err:description}</error>}
-    let $html-form-url := ""
-    return
-        if(exists($votable//*:TABLEDATA/*)) then
-        let $detail_cols := for $e in array:flatten($app:conf?extended-cols) return lower-case($e) (: values correspond to column names given by AS ...:)
-        let $field_names := for $e in $votable//*:FIELD/@name return lower-case($e)
-        let $source_id_idx := index-of($field_names, "source_id")
-        let $tr-count := count($votable//*:TABLEDATA/*)
-        return
-        <div class="aaaaa">
-            <table class="table table-responsive-xxl table-light datatable" data-found-targets="{$tr-count}" data-src-targets="Simbad">
-                <thead><tr><th><span class="badge rounded-pill bg-dark">{$tr-count}</span>&#160;Simbad&#160;Name</th>
-                    {for $f at $cpos in $votable//*:FIELD where $cpos != $source_id_idx
-                        let $unit :=if (ends-with($f/@name, "_as")) then "[arcsec]" else if (data($f/@unit)) then "["|| $f/@unit ||"]" else ()
-                        let $name :=if (ends-with($f/@name, "_as")) then replace($f/@name, "_as", "") else data($f/@name)
-                        return
-                        <th title="{$f/*:DESCRIPTION}">{if($field_names[$cpos]=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()}{$name} &#160; {$unit}</th>
-                    }
-                    <th>GetStar</th>
-                </tr></thead>
-                    {
-                    for $tr in $votable//*:TABLEDATA/* return
-                        <tr>{
-                            let $main_id := $tr/*[1] (: id alway must be requested as first param in the query :)
-                            let $target_link := <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($main_id)}" target="_blank">{replace($main_id," ","&#160;")}</a>
-                            let $getstar-url := "https://apps.jmmc.fr/~sclws/getstar/sclwsGetStarProxy.php?star="||encode-for-uri($main_id)
-                            let $getstar-link := <a href="{$getstar-url}" target="_blank"><i class="bi bi-box-arrow-up-right"></i></a>
-                            return
-                                (
-                                    <td>{$target_link}</td>,
-                                    for $td at $cpos in $tr/* where $cpos != 1 return
-                                        element {"td"} {attribute {"class"} {if( $field_names[$cpos]=$detail_cols ) then "d-none extcols table-primary" else ()},try { let $d := xs:double($td) return format-number($d, "0.###") } catch * { if(string-length($td)>1) then data($td) else "-" }},
-                                    <td>{$getstar-link}<!--{$getstar-votable//*:TABLEDATA/*:TR/*:TD[121]/text()}--></td>
-                                )
-                        }</tr>
-                }
-            </table>
-            {$query-code}
-        </div>
-        else
-            <div>
-                {
-                    if ( name($votable)='error' or $votable//*:INFO[@name="QUERY_STATUS" and @value="ERROR"]) then let $anchor := "error-"||util:uuid() return
-                        (<a id="{$anchor}" href="#{$anchor}" class="text-danger" onclick='$(".extdebug").toggleClass("d-none");'>Sorry, an error occured in the query.</a>
-                       , <code class="extdebug d-none"><br/>{serialize($votable)}</code>)
-                    else
-                        <span>Sorry, no fringe traking star found for <b>{$s/name/text()} in Simbad</b>. <code class="extdebug d-none"><br/>{serialize($votable)}</code></span>
-                }
-                {$query-code}
-            </div>
-};
-
-declare function app:searchftt-simbad-query($identifier, $max) as xs:string{
-    let $s := app:resolve-by-name($identifier)
-    let $ra := $s/ra
-    let $dec := $s/dec
-    let $max-mag-filters := <text>( K&lt;{$max?magK_UT} AND V&lt;{$max?magV} ) OR ( K&lt;{$max?magK_AT} AND R&lt;{$max?magR})</text>
-    let $query := <text>
-    SELECT
-        DISTINCT main_id as source_id, DISTANCE(POINT('ICRS', ra, dec),POINT('ICRS', {$ra},{$dec}))*3600.0 as dist_as, ra, dec, pmra,pmdec, G, K, V, R, otype_txt
-    FROM
-        basic JOIN allfluxes ON oid=oidref JOIN ident USING(oidref)
-    WHERE
-        CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', {$ra}, {$dec}, {$max?dist_as}/3600.0)) = 1
-          AND
-        ( {$max-mag-filters} )
-    ORDER BY
-        dist_as;
-    </text>
-    return
-        $query
-};
-
 declare function app:search($id, $max, $s, $cat) {
-	let $query := app:searchftt-query($id, $max, $cat)
-    let $votable := jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $max?rec, $cat?tap_format)
+   	let $log := util:log("info", "searching single ftt in "||$cat?cat_name||" ...")
+	let $query := app:searchftt-query($id, (), $max, $cat)
+    let $votable := try{jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $max?rec, $cat?tap_format) }catch * {util:log("error", serialize($err:value))}
     let $votable-url := jmmc-tap:tap-adql-query-uri($cat?tap_endpoint,$query, $max?rec, $cat?tap_format)
     let $query-code := <div class="extquery d-none"><pre><br/>{data($query)}</pre><a target="_blank" href="{$votable-url}">get original votable</a></div>
 	let $src := if ($cat?tap_viewer)  then <a class="extquery d-none" href="{$cat?tap_viewer||encode-for-uri($query)}">View original votable</a> else ()
+    let $log := util:log("info", "done")
     return
 
     if(exists($votable//*:TABLEDATA/*)) then
@@ -553,24 +471,38 @@ declare function app:search($id, $max, $s, $cat) {
 };
 
 declare function app:bulk-search($input-votable, $max, $cat) {
-	let $query := app:searchftt-query($input-votable, $max, $cat)
+	let $log := util:log("info", "searching bulk ftt in "||$cat?cat_name||" ...")
+    let $query := app:searchftt-query((), $input-votable, $max, $cat)
     let $query-code := <div class="extquery d-none"><pre><br/>{data($query)}</pre></div>
     let $max-rec := $max?rec * count($input-votable//*:TR) * 10
-    let $votable := jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $input-votable, $max-rec, $cat?tap_format)
-    return
-        (<h3>{$cat?cat_name}</h3>
-        ,<table class="table table-light table-bordered datatable {if($cat?main_cat) then () else "extcats d-none"} ">
-            <thead><tr>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{data($field/@name)}</th>}</tr></thead>
-            {for $trs in $votable//*:TR return <tr>{for $td in $trs/*:TD return <td>{data($td)}</td>}</tr>}
-        </table>
-        (: ,serialize($votable) :)
-        ,$query-code)
+    let $votable := <error>IGNORED</error>
+    let $votable := try{jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $input-votable, $max-rec, $cat?tap_format)}catch * {<a><error>{$err:description}</error></a>}
 
+    let $log := util:log("info", "done")
+    let $table := if($votable/error)
+         then
+            <div class="alert alert-danger" role="alert">
+                Error trying to get votable.<br/>
+                <pre>{data($votable)}</pre>
+            </div>
+        else
+            <table class="table table-light table-bordered datatable">
+                <thead><tr>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{data($field/@name)}</th>}</tr></thead>
+                {for $trs in $votable//*:TR return <tr>{for $td in $trs/*:TD return <td>{data($td)}</td>}</tr>}
+            </table>
+
+    return
+        <div class="{if($cat?main_cat) then () else "extcats d-none"}">
+        <h3>{$cat?cat_name} ({count($table//tr[td])})</h3>
+        {$table}
+        {<code class="extdebug d-none"><br/>{serialize($votable)}</code>}
+        {$query-code}
+        </div>
 };
 
-declare function app:searchftt-query($identifier-or-votable, $max, $cat as map(*)){
-    let $votname := if($identifier-or-votable instance of node()) then $identifier-or-votable//*:TABLE/@name else ()
-    let $s := if($votname)  then $votname else app:resolve-by-name($identifier-or-votable)
+declare function app:searchftt-query($identifier, $votable, $max, $cat as map(*)){
+    let $votname := if($votable) then $votable//*:TABLE/@name else ()
+    let $s := if($votname)  then $votname else app:resolve-by-name($identifier)
     let $ra := if($votname) then $votname||".my_ra" else $s/ra
     let $dec := if($votname) then $votname||".my_dec" else $s/dec
     let $pmra := if($votname) then $votname||".my_pmra" else try{ xs:double($s/pmra) } catch * {0}
@@ -581,6 +513,8 @@ declare function app:searchftt-query($identifier-or-votable, $max, $cat as map(*
 
     (: We could have built query with COALESCE to replace missing pmra by 0, but:
         GAVO does not support it inside a formulae and VizieR forbid it  :(
+
+        TODO simplify distance computation if we do not have any pm info ?
     :)
     let $distance_J2000 := <dist_as>DISTANCE(
         POINT( 'ICRS', {$cat?ra} - ( ({$cat?epoch}-2000.0) * {$cat?pmra} ) / 3600000.0, {$cat?dec} - ( ( {$cat?epoch}-2000.0) * {$cat?pmdec} ) / 3600000.0  )
@@ -624,7 +558,20 @@ declare function app:searchftt-query($identifier-or-votable, $max, $cat as map(*
         ,map:for-each( $cat?detail, function ($i, $j) { $i || ' AS ' ||$j})
         ), ", ")
 
-    let $query := <text>
+    let $positions :=    for $tr in subsequence($votable//*:TR,1,2000)
+        return
+            <position>CONTAINS( POINT('ICRS', {$tr/*:TD[2]}, {$tr/*:TD[3]}), CIRCLE('ICRS', {$cat?ra}, {$cat?dec}, {$max?dist_as}/3600.0) ) = 1</position>
+
+    let $positional-xmatch := if($votname)
+    then
+        <position>CONTAINS( POINT('ICRS', {$ra_in_cat}, {$dec_in_cat}), CIRCLE('ICRS', {$cat?ra}, {$cat?dec}, {$max?dist_as}/3600.0) ) = 1</position>
+        (: <positions>{string-join(("", $positions), " OR ")}</positions> :)
+    else
+        <position>CONTAINS( POINT('ICRS', {$ra_in_cat}, {$dec_in_cat}), CIRCLE('ICRS', {$cat?ra}, {$cat?dec}, {$max?dist_as}/3600.0) ) = 1</position>
+
+    let $comments := string-join((""), "&#10;")
+
+    let $query := <text>{$comments}
     SELECT
         {$science-name-col}
         {$cat?source_id} as source_id,
@@ -637,7 +584,7 @@ declare function app:searchftt-query($identifier-or-votable, $max, $cat as map(*
     FROM
         {$upload-from} {$from}
     WHERE
-        CONTAINS( POINT('ICRS', {$cat?ra}, {$cat?dec}), CIRCLE('ICRS', {$ra_in_cat}, {$dec_in_cat}, {$max?dist_as}/3600.0) ) = 1
+        {$positional-xmatch}
             AND
         {$max-mag-filters}
     ORDER BY
