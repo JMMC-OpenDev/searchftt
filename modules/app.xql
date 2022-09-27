@@ -33,7 +33,7 @@ declare variable $app:json-conf :='{
         "simcat": {
             "cat_name":"Simbad",
             "main_cat":true,
-            "description": "SIMBADTBD",
+            "description": "CDS / Simbad",
             "tap_endpoint": "http://simbad.u-strasbg.fr/simbad/sim-tap/sync",
             "tap_format" : "",
             "tap_viewer" : "",
@@ -152,7 +152,7 @@ declare variable $app:conf := parse-json($app:json-conf);
 :)
 declare function app:defaults() as map(*){
     map:entry("max", map:merge(
-        for $key in map:keys($app:conf?default)
+        for $key in map:keys($app:conf?default) where starts-with($key, "max")
             let $map-max-key:=replace($key, "max_", "")
             let $map-info-key:=$map-max-key||"_info"
             let $param := try{ xs:double( request:get-parameter($key, "") ) }catch * { () }
@@ -160,8 +160,7 @@ declare function app:defaults() as map(*){
             let $mapinfo:= if( exists($param) and ( $param != $conf)) then <mark title="overridden by user : default conf is {$conf}">{$param}</mark> else $conf
             let $mapvalue:= if( exists($param) ) then $param else $conf
             return ( map:entry($map-max-key, $mapvalue), map:entry($map-info-key, $mapinfo))
-        )
-    )
+    ))
 };
 
 declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*), $identifiers as xs:string*) {
@@ -206,12 +205,13 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
                 <li>Please <a href="http://www.jmmc.fr/feedback">fill a report</a> for any question or remark.</li>
             </ul>
         </p>
-        <form>{$params}
+        <form>
             <div class="p-3 input-group mb-3 ">
                 <input type="text" class="form-control" placeholder="Science identifiers (comma separated)" aria-label="Science identifiers (comma separated)" aria-describedby="b2"
                 id="identifiers" name="identifiers" value="{$identifiers}" required=""/>
                 <button class="btn btn-outline-secondary" type="submit" id="b2"><i class="bi bi-search"/></button>
             </div>
+            {$params}
         </form>
     </div>
     ,
@@ -243,7 +243,7 @@ declare function app:resolve-by-name($name-or-coords) {
     else
         let $coord := $name-or-coords => replace( "\+", " +") => replace ("\-", " -")
         let $t := for $e in tokenize($coord, " ")[string-length(.)>0]  return $e
-        return <s><position-only/><name>{normalize-space($name-or-coords)}</name><ra>{$t[1]}</ra><dec>{$t[2]}</dec><pmra>0.0</pmra><pmdec>0.0</pmdec></s>
+        return <s position-only="y"><name>{normalize-space($name-or-coords)}</name><ra>{$t[1]}</ra><dec>{$t[2]}</dec><pmra>0.0</pmra><pmdec>0.0</pmdec></s>
 };
 
 
@@ -251,17 +251,18 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
 
     let $fov_deg := 3 * $max?dist_as div 3600
 
-    let $ids := distinct-values($identifiers ! tokenize(., ",") ! tokenize(., ";"))
-
+    let $ids := distinct-values($identifiers ! tokenize(., ",") ! tokenize(., ";")!normalize-space(.))[string-length()>0]
+    let $count := count($ids)
     let $lis :=
         for $id at $pos in $ids
+        let $log := util:log("info", <txt>loop {$pos} / {$count}</txt>)
         let $s := app:resolve-by-name($id)
-        let $simbad-link := if($s/position-only) then <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={encode-for-uri($id)}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec">{$id}</a> else <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}">{$id}</a>
+        let $simbad-link := if($s/@position-only) then <a target="_blank" href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={encode-for-uri($id)}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec">{$id}</a> else <a target="_blank" href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}">{$id}</a>
         let $ra := $s/ra let $dec := $s/dec
         let $info := if(exists($s/ra))then
                 <ul class="list-group">
                     {
-                        for $cat in $app:conf?catalogs?* order by $cat?main_cat descending return
+                        for $cat in $app:conf?catalogs?* (: where $cat?enable = true() :) order by $cat?main_cat descending return
                             <li class="list-group-item d-flex justify-content-between align-items-start {if($cat?main_cat) then () else "extcats d-none"}">
                                 <div class="ms-2 me-auto">{app:search($id, $max, $s, $cat)}</div>
                             </li>
@@ -289,7 +290,7 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
                                     )
                             }
                             </div>
-                                { if (count($identifiers) < 100 and exists($s/ra)) then
+                                { if (count($ids) < 20 and exists($s/ra)) then
                                     <div class="col d-flex flex-row-reverse">
                                         <div id="aladin-lite-div{$pos}" style="width:200px;height:200px;"></div>
                                         <script type="text/javascript">
@@ -305,8 +306,33 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
                     </div>
                 </li>
             </ul></div>
+
+    let $merged-table :=
+        <table class="table table-light datatable">
+            <thead><th>Science</th>{($lis//thead)[1]//th}</thead>
+            {
+                for $table in $lis//table
+                    for $tr in $table//tr[td]
+                        return <tr><td>{data($table/@data-science)}</td>{$tr/td}</tr>
+            }
+        </table>
+
     return
-        (<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>, $lis)
+        <div>
+            <script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>
+            <ul class="nav nav-tabs" id="myTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="home-tab" data-bs-toggle="tab" data-bs-target="#home-tab-pane" type="button" role="tab" aria-controls="home-tab-pane" aria-selected="true">Result list</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile-tab-pane" type="button" role="tab" aria-controls="profile-tab-pane" aria-selected="false">Merged table</button>
+                </li>
+            </ul>
+            <div class="tab-content" id="myTabContent">
+            <div class="tab-pane fade show active" id="home-tab-pane" role="tabpanel" aria-labelledby="home-tab" tabindex="0">{$lis}</div>
+            <div class="tab-pane fade" id="profile-tab-pane" role="tabpanel" aria-labelledby="profile-tab" tabindex="0">{$merged-table}</div>
+            </div>
+        </div>
 };
 
 declare function app:search($id, $max, $s, $cat) {
@@ -326,7 +352,7 @@ declare function app:search($id, $max, $s, $cat) {
         let $tr-count := count($votable//*:TABLEDATA/*)
         return
         <div class="table-responsive">
-            <table class="table table-light datatable" data-found-targets="{$tr-count}" data-src-targets="{$cat?cat_name}">
+            <table class="table table-light datatable" data-found-targets="{$tr-count}" data-src-targets="{$cat?cat_name}" data-science="{$s/name}">
                 <thead><tr>
                     {for $f at $cpos in $votable//*:FIELD return
                         if ($cpos != $source_id_idx) then
@@ -385,25 +411,36 @@ declare function app:search($id, $max, $s, $cat) {
         </div>
 };
 
-declare %templates:wrap function app:bulk-form($node as node(), $model as map(*), $identifiers as xs:string*, $format as xs:string*) {
-    let $max := app:defaults()("max")
-    let $params :=  for $p in request:get-parameter-names()[.!="identifiers"] return <input type="hidden" name="{$p}" value="{request:get-parameter($p,' ')}"/>
+declare %templates:wrap function app:bulk-form($node as node(), $model as map(*), $identifiers as xs:string*, $format as xs:string*, $catalogs as xs:string*) {
+    let $defaults := app:defaults()
+    let $max := $defaults("max")
+    let $params :=  for $p in request:get-parameter-names() where not ( $p=("identifiers", "catalogs") ) return <input type="hidden" name="{$p}" value="{request:get-parameter($p,' ')}"/>
+    let $default-catalogs := for $cat in $app:conf?catalogs?* order by $cat?main_cat descending return $cat?cat_name
+    let $user-catalogs := request:get-parameter("catalogs", ())
+    let $cats-params := for $catalog in $default-catalogs
+        return
+            <div class="form-check form-check-inline">
+                { element input { attribute class {"form-check-input"}, attribute type {"checkbox"}, attribute name {"catalogs"}, attribute value {$catalog}, if (empty($user-catalogs) or $catalog=$user-catalogs) then attribute checked {"true"}  else ()} }
+                <label class="form-check-label">{$catalog}</label>
+            </div>
+    let $user-catalogs := if( exists($user-catalogs) ) then $user-catalogs else $default-catalogs
     return
     (
     <div>
         <h1>Bulk form!</h1>
         <p>This new form provide an efficient way to query a large number of targets.</p>
-        <form method="post">{$params}
+        <form method="post">
             <div class="p-3 input-group mb-3 ">
                 <input type="text" class="form-control" placeholder="Science identifiers or coordinates (comma separated), e.g : 0 0, 4.321 6.543, HD123, HD234 " aria-label="Science identifiers (comma separated)" aria-describedby="b2"
                 id="identifiers" name="identifiers" value="{$identifiers}" required=""/>
                 <button class="btn btn-outline-secondary" type="submit" id="b2"><i class="bi bi-search"/></button>
             </div>
+            {$params},{$cats-params}
         </form>
     </div>
     ,
     if (exists($identifiers)) then (
-        app:searchftt-bulk-list($identifiers, $max),
+        app:searchftt-bulk-list($identifiers, $max, $user-catalogs),
         <script type="text/javascript">
         $(document).ready(function() {{
         $('.datatable').DataTable( {{
@@ -417,11 +454,11 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
     )
 };
 
-declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map(*) ) {
+declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map(*), $catalogs-to-query as xs:string* ) {
 
     let $fov_deg := 3 * $max?dist_as div 3600
 
-    let $ids := distinct-values($identifiers ! tokenize(., ",") ! tokenize(., ";"))
+    let $ids := distinct-values($identifiers ! tokenize(., ",") ! tokenize(., ";")!normalize-space(.))[string-length()>0]
 
     let $map := for $id in $ids return map{$id: app:resolve-by-name($id)}
     let $cols := $map?*[1]/* ! name(.)
@@ -436,9 +473,11 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
     let $votable := app:table2votable($table, "targets")
     let $targets :=<div><h3>Your { count($table//tr[td]) } targets </h3>{$table}</div>
 
-    let $res-tables :=  for $cat in $app:conf?catalogs?* (: where $cat?cat_name!="GSC2" :) order by $cat?main_cat descending
+    let $res-tables :=  for $cat-name in $catalogs-to-query
+        let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
+        where exists($cat)
         return
-            app:bulk-search($votable, $max, $cat)
+            app:bulk-search($votable, $max, $cat )
 
     return
         (<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>
@@ -454,7 +493,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
     let $query := app:build-query((), $input-votable, $max, $cat)
     let $query-code := <div class="extquery d-none"><pre><br/>{data($query)}</pre></div>
     let $max-rec := $max?rec * count($input-votable//*:TR) * 10
-    let $votable := <error>IGNORED</error>
+    let $votable := <error>SKIPPED</error>
     let $votable := try{jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $input-votable, $max-rec, $cat?tap_format)}catch * {<a><error>{$err:description}</error>{$err:value}</a>}
 
     let $log := util:log("info", "done")
@@ -549,6 +588,11 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         <position>CONTAINS( POINT('ICRS', {$ra_in_cat}, {$dec_in_cat}), CIRCLE('ICRS', {$cat?ra}, {$cat?dec}, {$max?dist_as}/3600.0) ) = 1</position>
 
     let $comments := string-join((""), "&#10;")
+
+    (: TODO
+        refactor bulk queries:
+            move positional_max next to the first join
+    :)
 
     let $query := <text>{$comments}
     SELECT
