@@ -191,7 +191,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
                 <li>Main catalogs<ul>{ for $cat in $app:conf?catalogs?* where $cat?main_cat return <li><b>{$cat?cat_name}</b>&#160;{parse-xml("<span>"||$cat?description||"</span>")}</li>}</ul></li>
                 {if ( false() = $app:conf?catalogs?*?main_cat ) then <li>Additionnal catalogs (use toggle button in the menu to get result tables)<ul>{ for $cat in $app:conf?catalogs?* where not($cat?main_cat) return <li><b>{$cat?cat_name}</b>&#160;{parse-xml("<span>"||$cat?description||"</span>")}</li>}</ul></li> else ()}
             </ul>
-            Each query is performed within {$max?dist_as_info}&apos; of the Science Target.
+            Each query is performed within {$max?dist_as_info}&apos;&apos; of the Science Target.
             A magnitude filter is applied on every Fringe Tracker Targets according to the best limits offered in P110
             for <b>UT (MACAO) OR AT (NAOMI)</b>  respectively <b>( K &lt; {$max?magK_UT_info} AND V &lt; {$max?magV_info} ) OR ( K &lt; {$max?magK_AT_info} AND R&lt;{$max?magR_info} )</b>.
             When missing, the V and R magnitudes are computed from the Gaia G, Grb and Grp magnitudes.
