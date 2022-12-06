@@ -183,7 +183,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
     (
     <div>
         <h1>GRAVITY-wide: finding off-axis fringe tracking targets.</h1>
-        <p>This newborn tool is in its first version and is subject to various changes in its early development phase.</p>
+        <p>This newborn tool is in its first versions and is subject to various changes in its early development phase.</p>
         <h2>Underlying method:</h2>
         <p>
             You can query one or several Science Targets. For each of them, suitable ringe Tracker Targets will be given using following research methods: <br/>
@@ -338,7 +338,7 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
 declare function app:search($id, $max, $s, $cat) {
    	let $log := util:log("info", "searching single ftt in "||$cat?cat_name||" ...")
 	let $query := app:build-query($id, (), $max, $cat)
-    let $votable := try{jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $max?rec, $cat?tap_format) }catch * {util:log("error", serialize($err:value)), $err:value}
+    let $votable := try{if(exists(request:get-parameter("dry", ()))) then <error>dry run : remote query SKIPPED ! </error> else jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $max?rec, $cat?tap_format) }catch * {util:log("error", serialize($err:value)), $err:value}
     let $votable-url := jmmc-tap:tap-adql-query-uri($cat?tap_endpoint,$query, $max?rec, $cat?tap_format)
     let $query-code := <div class="extquery d-none"><pre><br/>{data($query)}</pre><a target="_blank" href="{$votable-url}">get original votable</a></div>
 	let $src := if ($cat?tap_viewer)  then <a class="extquery d-none" href="{$cat?tap_viewer||encode-for-uri($query)}">View original votable</a> else ()
@@ -494,7 +494,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
     let $query-code := <div class="extquery d-none"><pre><br/>{data($query)}</pre></div>
     let $max-rec := $max?rec * count($input-votable//*:TR) * 10
     let $votable := <error>SKIPPED</error>
-    let $votable := try{jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $input-votable, $max-rec, $cat?tap_format)}catch * {<a><error>{$err:description}</error>{$err:value}</a>}
+    let $votable := try{if(exists(request:get-parameter("dry", ()))) then <error>dry run : remote query SKIPPED ! </error> else jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $input-votable, $max-rec, $cat?tap_format)}catch * {<a><error>{$err:description}</error>{$err:value}</a>}
 
     let $log := util:log("info", "done")
     let $table := if($votable/error or $votable//*:INFO[@name="QUERY_STATUS" and @value="ERROR"])

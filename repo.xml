@@ -4,7 +4,7 @@
   <description>Search Fringe Tracking Targets</description>
   <author>JMMC Tech Group</author>
   <website>https://www.jmmc.fr</website>
-  <status>beta</status><!-- stable/beta/alpha -->
+  <status>stable</status><!-- stable/beta/alpha -->
   <license>AGPL-3.0</license>
   <copyright>true</copyright>
   <type>application</type>
@@ -14,7 +14,8 @@
   <changelog xmlns="">
      <change version="1.4">
       <ul>
-        <li>Provides a bulk form if you get many objects to query</li>
+        <li>Tests to provide a bulk form if you get many objects to query</li>
+        <li>Fix typo and Guilaume's franglish.</li>
       </ul>
     </change>
      <change version="1.3">
