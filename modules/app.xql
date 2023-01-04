@@ -576,16 +576,9 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         ,map:for-each( $cat?detail, function ($i, $j) { $i || ' AS ' ||$j})
         ), ", ")
 
-    let $positions :=    for $tr in subsequence($votable//*:TR,1,2000)
-        return
-            <position>CONTAINS( POINT('ICRS', {$tr/*:TD[2]}, {$tr/*:TD[3]}), CIRCLE('ICRS', {$cat?ra}, {$cat?dec}, {$max?dist_as}/3600.0) ) = 1</position>
 
-    let $positional-xmatch := if($votname)
-    then
-        <position>CONTAINS( POINT('ICRS', {$ra_in_cat}, {$dec_in_cat}), CIRCLE('ICRS', {$cat?ra}, {$cat?dec}, {$max?dist_as}/3600.0) ) = 1</position>
-        (: <positions>{string-join(("", $positions), " OR ")}</positions> :)
-    else
-        <position>CONTAINS( POINT('ICRS', {$ra_in_cat}, {$dec_in_cat}), CIRCLE('ICRS', {$cat?ra}, {$cat?dec}, {$max?dist_as}/3600.0) ) = 1</position>
+    (: /!\ VizieR will never end the processing if we do not put the input position in the POINT :)
+    let $positional-xmatch := <position>CONTAINS( POINT('ICRS', {$cat?ra}, {$cat?dec}), CIRCLE('ICRS', {$ra_in_cat}, {$dec_in_cat}, {$max?dist_as}/3600.0) ) = 1</position>
 
     let $comments := string-join((""), "&#10;")
 
