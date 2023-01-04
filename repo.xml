@@ -14,7 +14,8 @@
   <changelog xmlns="">
      <change version="1.4">
       <ul>
-        <li>Tests to provide a bulk form if you get many objects to query</li>
+        <!-- <li>Tests to provide a bulk form if you get many objects to query</li>-->
+        <li>Refactor code : handle simbad as a catalog and prepare a later bulk form.</li>
         <li>Fix typo and Guilaume's franglish.</li>
       </ul>
     </change>
