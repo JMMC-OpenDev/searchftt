@@ -16,7 +16,7 @@ import module namespace jmmc-tap="http://exist.jmmc.fr/jmmc-resources/tap" at "/
 import module namespace jmmc-simbad="http://exist.jmmc.fr/jmmc-resources/simbad" at "/db/apps/jmmc-resources/content/jmmc-simbad.xql";
 (:import module namespace jmmc-astro="http://exist.jmmc.fr/jmmc-resources/astro" at "/db/apps/jmmc-resources/content/jmmc-astro.xql";:) (: WARNING this module require to enable eXistDB's Java Binding :)
 
-(: Main config to unify catalog accross their colnames  - we could try to put Simbad inside ? :)
+(: Main config to unify catalog accross their colnames or simbad :)
 declare variable $app:json-conf :='{
     "default":{
         "max_magV" : 15,
@@ -33,7 +33,8 @@ declare variable $app:json-conf :='{
         "simcat": {
             "cat_name":"Simbad",
             "main_cat":true,
-            "description": "CDS / Simbad",
+            "bulk"    : true,
+            "description": "<a href=&apos;http://simbad.u-strasbg.fr/&apos;>CDS / Simbad</a>",
             "tap_endpoint": "http://simbad.u-strasbg.fr/simbad/sim-tap/sync",
             "tap_format" : "",
             "tap_viewer" : "",
@@ -76,9 +77,10 @@ declare variable $app:json-conf :='{
             "from"    : "gaia.dr2light JOIN gdr2ap.main ON gaia.dr2light.source_id=gdr2ap.main.source_id"
         },"esagaia3": {
             "enable" : true,
-            "cat_name"    : "Gaia DR3",
-            "main_cat":true,
-            "description" : "Gaia DR3 catalogues and cross-matched catalogues though <a href=&apos;https://www.cosmos.esa.int/web/gaia-users/archive&apos;>ESA archive center</a>.",
+            "cat_name"     : "Gaia DR3",
+            "main_cat"     : true,
+            "bulk"         : true,
+            "description"  : "Gaia DR3 catalogues and cross-matched catalogues though <a href=&apos;https://www.cosmos.esa.int/web/gaia-users/archive&apos;>ESA archive center</a>.",
             "tap_endpoint" : "https://gea.esac.esa.int/tap-server/tap/sync",
             "tap_format"   : "votable_plain",
             "tap_viewer"   : "",
@@ -94,7 +96,11 @@ declare variable $app:json-conf :='{
             "mag_bp" : "gaia.phot_bp_mean_mag",
             "mag_rp" : "gaia.phot_rp_mean_mag",
             "detail"      : { "tmass.h_m":"H_mag", "tmass_nb.angular_distance":"tmass_dist", "tmass.designation":"J_2MASS" },
-            "from"        : "gaiadr3.gaia_source as gaia JOIN gaiaedr3.tmass_psc_xsc_best_neighbour AS tmass_nb USING (source_id) JOIN gaiaedr3.tmass_psc_xsc_join AS xjoin    ON tmass_nb.original_ext_source_id = xjoin.original_psc_source_id JOIN gaiadr1.tmass_original_valid AS tmass ON xjoin.original_psc_source_id = tmass.designation"
+            "from"  :
+                [
+                    "gaiadr3.gaia_source_lite as gaia",
+                    "gaiadr3.gaia_source_lite as gaia USING (source_id) JOIN gaiaedr3.tmass_psc_xsc_best_neighbour AS tmass_nb USING (source_id) JOIN gaiaedr3.tmass_psc_xsc_join AS xjoin ON tmass_nb.original_ext_source_id = xjoin.original_psc_source_id JOIN gaiadr1.tmass_original_valid AS tmass ON xjoin.original_psc_source_id = tmass.designation"
+                ]
         },"esagaia2": {
             "cat_name"    : "Gaia DR2",
             "main_cat":false,
@@ -415,7 +421,7 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
     let $defaults := app:defaults()
     let $max := $defaults("max")
     let $params :=  for $p in request:get-parameter-names() where not ( $p=("identifiers", "catalogs") ) return <input type="hidden" name="{$p}" value="{request:get-parameter($p,' ')}"/>
-    let $default-catalogs := for $cat in $app:conf?catalogs?* order by $cat?main_cat descending return $cat?cat_name
+    let $default-catalogs := for $cat in $app:conf?catalogs?* where exists($cat?bulk) order by $cat?main_cat descending return $cat?cat_name
     let $user-catalogs := request:get-parameter("catalogs", ())
     let $cats-params := for $catalog in $default-catalogs
         return
@@ -455,9 +461,6 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
 };
 
 declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map(*), $catalogs-to-query as xs:string* ) {
-
-    let $fov_deg := 3 * $max?dist_as div 3600
-
     let $ids := distinct-values($identifiers ! tokenize(., ",") ! tokenize(., ";")!normalize-space(.))[string-length()>0]
 
     let $map := for $id in $ids return map{$id: app:resolve-by-name($id)}
@@ -489,19 +492,38 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
 
 
 declare function app:bulk-search($input-votable, $max, $cat) {
+    let $start-time := util:system-time()
 	let $log := util:log("info", "searching bulk ftt in "||$cat?cat_name||" ...")
-    let $query := app:build-query((), $input-votable, $max, $cat)
-    let $query-code := <div class="extquery d-none"><pre><br/>{data($query)}</pre></div>
-    let $max-rec := $max?rec * count($input-votable//*:TR) * 10
+    let $query :=  app:build-query((), $input-votable, $max, $cat)
+    let $query-code := <div class="extquery d-none">{for $q in $query return <pre><br/>{data($q)}<br/></pre>}</div>
+    let $max-rec := $max?rec * count($input-votable//*:TR) * 100 (: TODO show this magic value in doc :)
     let $votable := <error>SKIPPED</error>
-    let $votable := try{if(exists(request:get-parameter("dry", ()))) then <error>dry run : remote query SKIPPED ! </error> else jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $input-votable, $max-rec, $cat?tap_format)}catch * {<a><error>{$err:description}</error>{$err:value}</a>}
+    let $votable :=
+        try{
+            if(exists(request:get-parameter("dry", ())))
+            then
+                <error>dry run : remote query SKIPPED !</error>
+            else
+                if (count($query)=1) then
+                    jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $input-votable, $max-rec, $cat?tap_format)
+                else
+                    let $input-votable2 := jmmc-tap:tap-adql-query($cat?tap_endpoint,$query[1], $input-votable, $max-rec, $cat?tap_format)
+                    return
+                        if( $input-votable2/error or $input-votable2//*:INFO[@name="QUERY_STATUS" and @value="ERROR"] )
+                        then
+                            $input-votable2
+                        else
+                            jmmc-tap:tap-adql-query($cat?tap_endpoint,$query[2], $input-votable2, $max-rec, $cat?tap_format, "step2")
+        } catch * {
+            <a><error>{$err:description}</error>{$err:value}</a>
+        }
 
-    let $log := util:log("info", "done")
     let $table := if($votable/error or $votable//*:INFO[@name="QUERY_STATUS" and @value="ERROR"])
          then
             <div class="alert alert-danger" role="alert">
                 Error trying to get votable.<br/>
                 <pre>{data($votable)}</pre>
+                {util:log("error", data($votable))}
             </div>
         else
             <table class="table table-light table-bordered datatable">
@@ -509,16 +531,21 @@ declare function app:bulk-search($input-votable, $max, $cat) {
                 {for $trs in $votable//*:TR return <tr>{for $td in $trs/*:TD return <td>{data($td)}</td>}</tr>}
             </table>
 
+    let $log := util:log("info", "done ("||seconds-from-duration(util:system-time()-$start-time)||"s)")
+
     return
         <div class="{if($cat?main_cat) then () else "extcats d-none"}">
         <h3>{$cat?cat_name} ({count($table//tr[td])})</h3>
         {$table}
-        {<code class="extdebug d-none"><br/>{serialize($votable)}</code>}
         {$query-code}
+        {<code class="extdebug d-none"><br/>{serialize($votable)}<br/> Duration for this catalog : {seconds-from-duration(util:system-time()-$start-time)}s</code>}
         </div>
 };
 
 declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
+    let $froms := array:flatten($cat?from)
+    let $multiquery := count($froms)>1 and exists($votable)
+    let $singlequery := not($multiquery)
     let $votname := if($votable) then $votable//*:TABLE/@name else ()
     let $s := if($votname)  then $votname else app:resolve-by-name($identifier)
     let $ra := if($votname) then $votname||".my_ra" else $s/ra
@@ -551,9 +578,11 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $v_filter := if ($vmag) then $vmag else <text>( {$cat?mag_g } - ( -0.0176 - 0.00686* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1732*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
     let $r_filter := if ($rmag) then $rmag else <text>( {$cat?mag_g } - ( 0.003226 + 0.3833* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1345*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
     let $max-mag-filters := <text>( ({$cat?mag_k }&lt;{$max?magK_UT} AND {$v_filter}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} AND {$r_filter}&lt;{$max?magR}) )</text>
+    let $amax-mag-filters := <text>( ({$cat?mag_k }&lt;{$max?magK_UT} OR {$v_filter}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} OR {$r_filter}&lt;{$max?magR}) )</text>
 
     (: escape catalogs with / inside  (VizieR case):)
-    let $from := if(contains($cat?from, "/")) then '"'||$cat?from||'"' else $cat?from
+    let $from := if($singlequery) then string-join($froms, " JOIN ") else $froms[1]
+    let $from := if(contains($from, "/")) then '"'||$from||'"' else $from
 
     let $numerical_epoch := try{let $num := xs:double($cat?epoch) return true() }catch*{false()}
     let $ra_in_cat := if($numerical_epoch) then <ra>{$ra}-((2000.0-{$cat?epoch})*{$pmra})/3600000.0</ra> else $ra
@@ -574,8 +603,11 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         ,<m>{$v_filter} as {$computed_prefix}mag_v</m>
         ,<m>{$r_filter} as {$computed_prefix}mag_r</m>
         ,map:for-each( $cat?detail, function ($i, $j) { $i || ' AS ' ||$j})
-        ), ", ")
+        ), ",&#10;        ")
 
+    (: It seems not possible to add this in the select part ??
+    let $flags := <text>{$cat?mag_k }&lt;{$max?magK_UT} , {$v_filter}&lt;{$max?magV} , {$cat?mag_k }&lt;{$max?magK_AT} , {$r_filter}&lt;{$max?magR} , </text>
+    :)
 
     (: /!\ VizieR will never end the processing if we do not put the input position in the POINT :)
     let $positional-xmatch := <position>CONTAINS( POINT('ICRS', {$cat?ra}, {$cat?dec}), CIRCLE('ICRS', {$ra_in_cat}, {$dec_in_cat}, {$max?dist_as}/3600.0) ) = 1</position>
@@ -586,7 +618,6 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         refactor bulk queries:
             move positional_max next to the first join
     :)
-
     let $query := <text>{$comments}
     SELECT
         {$science-name-col}
@@ -595,19 +626,32 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         {$distance_catalog},
         {$cat?ra} as ra, {$cat?dec} as dec,
         {$cat?pmra}, {$cat?pmdec},
-        {$cat?epoch} as epoch,
-        {$mags}
+        {$cat?epoch} as epoch{","[$singlequery]}
+        {$mags[$singlequery]}
     FROM
         {$upload-from} {$from}
     WHERE
         {$positional-xmatch}
-            AND
-        {$max-mag-filters}
+
+        {" AND "[$singlequery]}
+        {$max-mag-filters[$singlequery]}
     ORDER BY
         {$order-by} j2000_dist_as
     </text>
+
+    let $subquery := if($singlequery) then () else <text>
+    SELECT
+        step2.*,
+        {$mags[not($singlequery)]}
+    FROM
+        TAP_UPLOAD.step2 as step2
+        JOIN {$froms[2]}
+    </text>
+
     return
-        $query
+        if($singlequery) then $query
+        else
+        ($query, $subquery)
 };
 
 
