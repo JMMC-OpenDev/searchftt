@@ -480,7 +480,7 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
         <thead>{$th}</thead>
         {$trs}
         </table>
-    let $votable := app:table2votable($table, "targets")
+    let $votable := jmmc-tap:table2votable($table, "targets")
     let $targets :=<div><h3>Your { count($table//tr[td]) } targets </h3>{$table}</div>
 
     let $res-tables :=  for $cat-name in $catalogs-to-query
@@ -661,26 +661,3 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         else
         ($query, $subquery)
 };
-
-
-declare function app:table2votable($table, $name){
-    <VOTABLE xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.4" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/v1.3">
-        <RESOURCE type="input">
-            <TABLE name="{$name}">
-                {
-                    let $tds := ($table//*:tr[*:td])[1]/*:td
-                    for $col at $pos in $table//*:th
-                        let $type := try{ let $a := xs:double($tds[$pos]) return "double"} catch * {"char"}
-                        let $arraysize := if($type="char") then "*" else "1"
-                        return <FIELD datatype="{$type}" arraysize="{$arraysize}" name="my_{$col}"/>
-                }
-                <DATA>
-                    <TABLEDATA>
-                        { for $tr in $table//*:tr[*:td] return <TR>{for $td in $tr/*:td return <TD>{data($td)}</TD>}</TR> }
-                    </TABLEDATA>
-                </DATA>
-            </TABLE>
-        </RESOURCE>
-    </VOTABLE>
-};
-
