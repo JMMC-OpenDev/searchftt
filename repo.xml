@@ -12,6 +12,12 @@
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
   <changelog xmlns="">
+     <change version="1.5">
+      <ul>
+        <li>Refactor bulk mode code to support big catalog queries in two step (position and magnitudes constraints).</li>      
+        <li>Format decimal values (3 digits).</li>  
+      </ul>
+    </change>
      <change version="1.4">
       <ul>
         <!-- <li>Tests to provide a bulk form if you get many objects to query</li>-->

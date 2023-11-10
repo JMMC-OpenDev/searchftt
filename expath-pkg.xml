@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://expath.org/ns/pkg" name="http://exist.jmmc.fr/searchftt/apps/searchftt" abbrev="searchftt" version="1.4.2" spec="1.0">
-  <title>GRAVITY-wide: finding off-axis fringe tracking targets.</title>
-
+<package xmlns="http://expath.org/ns/pkg" name="http://exist.jmmc.fr/searchftt/apps/searchftt" abbrev="searchftt" version="1.5.0" spec="1.0">
+  <title>Find fringe tracking and adaptiv optic targets.</title>
   <dependency processor="http://exist-db.org" semver-min="5.0.0"/>
   <dependency package="http://exist-db.org/html-templating" semver-min="1.0.2"/>
 </package>
