@@ -181,6 +181,34 @@ declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*
         }</li>[exists($identifiers)]
 };
 
+declare function app:datatable-script(){
+    <script type="text/javascript">
+        var formatTable = true; // TODO enhance table metadata so we rely on it and limit formating on some columns
+        $(document).ready(function() {{
+        $('.datatable').DataTable( {{            
+            /* */
+            "aoColumnDefs": [
+            {{
+                "targets": '_all',
+                "mRender": function ( data, type, row ) {{      
+                    if(type == "display" &amp;&amp; formatTable ){{                                        
+                        fdata=parseFloat(Number(data))
+                        if(isNaN(fdata) || data % 1 == 0){{
+                            return data;
+                        }}                    
+                        return fdata.toFixed(3);                                                   
+                    }} 
+                    return data;
+                }}                                    
+            }},
+            ],            
+            "paging": false,"searching":false,"info": false,"order": []
+        }});
+
+        }});
+    </script>
+};
+
 
 declare %templates:wrap function app:form($node as node(), $model as map(*), $identifiers as xs:string*, $format as xs:string*) {
     let $max := app:defaults()("max")
@@ -221,20 +249,10 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
         </form>
     </div>
     ,
-    if (exists($identifiers)) then (
-        app:searchftt-list($identifiers, $max),
-        <script type="text/javascript">
-        $(document).ready(function() {{
-        $('.datatable').DataTable( {{
-            "paging": false,"searching":false,"info": false,"order": []
-        }});
-
-        }});
-        </script>
-
-        ) else ()
+    if (exists($identifiers)) then ( app:searchftt-list($identifiers, $max), app:datatable-script() ) else ()
     )
 };
+
 
 (:~
  : Resolve name using simbad or forge the same response if coordinates are detected.
@@ -441,22 +459,11 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
                 id="identifiers" name="identifiers" value="{$identifiers}" required=""/>
                 <button class="btn btn-outline-secondary" type="submit" id="b2"><i class="bi bi-search"/></button>
             </div>
-            {$params},{$cats-params}
+            {$params}{$cats-params}
         </form>
     </div>
     ,
-    if (exists($identifiers)) then (
-        app:searchftt-bulk-list($identifiers, $max, $user-catalogs),
-        <script type="text/javascript">
-        $(document).ready(function() {{
-        $('.datatable').DataTable( {{
-            "paging": false,"searching":false,"info": false,"order": []
-        }});
-
-        }});
-        </script>
-
-        ) else ()
+    if (exists($identifiers)) then ( app:searchftt-bulk-list($identifiers, $max, $user-catalogs), app:datatable-script()) else ()
     )
 };
 
@@ -537,6 +544,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
         <div class="{if($cat?main_cat) then () else "extcats d-none"}">
         <h3>{$cat?cat_name} ({count($table//tr[td])})</h3>
         {$table}
+        {(: <a href="data:application/x-votable+xml;base64,YOURBASE64DATA" type="application/x-votable+xml">Download VOTABLE</a> :)}        
         {$query-code}
         {<code class="extdebug d-none"><br/>{serialize($votable)}<br/> Duration for this catalog : {seconds-from-duration(util:system-time()-$start-time)}s</code>}
         </div>
