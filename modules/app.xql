@@ -99,7 +99,7 @@ declare variable $app:json-conf :='{
             "from"  :
                 [
                     "gaiadr3.gaia_source_lite as gaia",
-                    "gaiadr3.gaia_source_lite as gaia USING (source_id) JOIN gaiaedr3.tmass_psc_xsc_best_neighbour AS tmass_nb USING (source_id) JOIN gaiaedr3.tmass_psc_xsc_join AS xjoin ON tmass_nb.original_ext_source_id = xjoin.original_psc_source_id JOIN gaiadr1.tmass_original_valid AS tmass ON xjoin.original_psc_source_id = tmass.designation"
+                    "gaiaedr3.tmass_psc_xsc_best_neighbour AS tmass_nb USING (source_id) JOIN gaiaedr3.tmass_psc_xsc_join AS xjoin ON tmass_nb.original_ext_source_id = xjoin.original_psc_source_id JOIN gaiadr1.tmass_original_valid AS tmass ON xjoin.original_psc_source_id = tmass.designation"
                 ]
         },"esagaia2": {
             "cat_name"    : "Gaia DR2",
@@ -233,7 +233,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
         </p>
         <p>
             <ul>
-                <li>Enter comma separated names ( SearchFTT will try to resolve it using <a href="http://simbad.u-strasbg.fr">Simbad</a> ) or coordinates (RA +/-DEC in degrees J2000), in the TextBox below.</li>
+                <li>Enter semicolon separated names ( SearchFTT will try to resolve it using <a href="http://simbad.u-strasbg.fr">Simbad</a> ) or coordinates (RA +/-DEC in degrees J2000), in the TextBox below.</li>
                 <li>Move your pointer to the column titles of the result tables to get the column descriptions.</li>
                 <li>To send a target to <a href="https://www.jmmc.fr/getstar">Aspro2</a> (already open), click on the icon in the <a href="https://www.jmmc.fr/getstar">GetStar</a> column, then press "Send Votable".</li>
                 <li>Please <a href="http://www.jmmc.fr/feedback">fill a report</a> for any question or remark.</li>
@@ -241,7 +241,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
         </p>
         <form>
             <div class="p-3 input-group mb-3 ">
-                <input type="text" class="form-control" placeholder="Science identifiers (comma separated)" aria-label="Science identifiers (comma separated)" aria-describedby="b2"
+                <input type="text" class="form-control" placeholder="Science identifiers (semicolon separator) e.g.: HD123;HD345;HD456" aria-label="Science identifiers (semicolon separator)" aria-describedby="b2"
                 id="identifiers" name="identifiers" value="{$identifiers}" required=""/>
                 <button class="btn btn-outline-secondary" type="submit" id="b2"><i class="bi bi-search"/></button>
             </div>
@@ -253,6 +253,11 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
     )
 };
 
+declare %private function app:fake-target($coords) {
+    let $coord := $coords => replace( "\+", " +") => replace ("\-", " -")
+    let $t := for $e in tokenize($coord, " ")[string-length(.)>0]  return $e
+        return <target position-only="y"><name>{normalize-space($coords)}</name><ra>{$t[1]}</ra><dec>{$t[2]}</dec><pmra>0.0</pmra><pmdec>0.0</pmdec></target>
+};
 
 (:~
  : Resolve name using simbad or forge the same response if coordinates are detected.
@@ -265,17 +270,32 @@ declare function app:resolve-by-name($name-or-coords) {
     then
         jmmc-simbad:resolve-by-name($name-or-coords)
     else
-        let $coord := $name-or-coords => replace( "\+", " +") => replace ("\-", " -")
-        let $t := for $e in tokenize($coord, " ")[string-length(.)>0]  return $e
-        return <s position-only="y"><name>{normalize-space($name-or-coords)}</name><ra>{$t[1]}</ra><dec>{$t[2]}</dec><pmra>0.0</pmra><pmdec>0.0</pmdec></s>
+        app:fake-target($name-or-coords)
 };
 
+(:~
+ : Resolve names using simbad or forge the same response if coordinates are detected.
+ :
+ : @param $name-or-coords name or coordinates
+ : @return a map of identifier with associated target element (see jmmc-simbad:resolve-by-name or app:fake-target format)
+ :)
+declare function app:resolve-by-names($name-or-coords) {
+    let  $names := $name-or-coords[matches(., "[a-z]", "i")]
+    let $coords := $name-or-coords[not(matches(., "[a-z]", "i"))] (: should we check for :)
+    
+    let $map := map:merge((
+        for $c in $coords return map:entry($c, app:fake-target($c))
+        ,jmmc-simbad:resolve-by-names($names)
+    ))
+    return $map
+};
 
 declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) {
 
     let $fov_deg := 3 * $max?dist_as div 3600
 
-    let $ids := distinct-values($identifiers ! tokenize(., ",") ! tokenize(., ";")!normalize-space(.))[string-length()>0]
+    let $ids := distinct-values($identifiers ! tokenize(., ";") ! normalize-space(.))[string-length()>0]
+    let $ids2names := app:resolve-by-names($identifiers)
     let $count := count($ids)
     let $lis :=
         for $id at $pos in $ids
@@ -455,7 +475,7 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
         <p>This new form provide an efficient way to query a large number of targets.</p>
         <form method="post">
             <div class="p-3 input-group mb-3 ">
-                <input type="text" class="form-control" placeholder="Science identifiers or coordinates (comma separated), e.g : 0 0, 4.321 6.543, HD123, HD234 " aria-label="Science identifiers (comma separated)" aria-describedby="b2"
+                <input type="text" class="form-control" placeholder="Science identifiers or coordinates (semicolon separator), e.g : 0 0; 4.321 6.543; HD123; HD234 " aria-label="Science identifiers (semicolon separator)" aria-describedby="b2"
                 id="identifiers" name="identifiers" value="{$identifiers}" required=""/>
                 <button class="btn btn-outline-secondary" type="submit" id="b2"><i class="bi bi-search"/></button>
             </div>
@@ -468,12 +488,12 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
 };
 
 declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map(*), $catalogs-to-query as xs:string* ) {
-    let $ids := distinct-values($identifiers ! tokenize(., ",") ! tokenize(., ";")!normalize-space(.))[string-length()>0]
-
-    let $map := for $id in $ids return map{$id: app:resolve-by-name($id)}
+    let $ids := distinct-values($identifiers ! tokenize(., ";")!normalize-space(.))[string-length()>0]
+    let $map := app:resolve-by-names($ids)
+    
     let $cols := $map?*[1]/* ! name(.)
     let $th := <tr> {$cols ! <th>{.}</th>}</tr>
-    let $trs := for $star in $map?*
+    let $trs := for $star in $map?* order by $star
         return <tr> {for $col in $cols return <td>{data($star/*[name(.)=$col])}</td> } </tr>
 
     let $table := <table class="table table-light datatable">
@@ -552,8 +572,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
 
 declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $froms := array:flatten($cat?from)
-    let $multiquery := count($froms)>1 and exists($votable)
-    let $singlequery := not($multiquery)
+    let $singlequery := count($froms)=1 or empty($votable)
     let $votname := if($votable) then $votable//*:TABLE/@name else ()
     let $s := if($votname)  then $votname else app:resolve-by-name($identifier)
     let $ra := if($votname) then $votname||".my_ra" else $s/ra
@@ -589,7 +608,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $amax-mag-filters := <text>( ({$cat?mag_k }&lt;{$max?magK_UT} OR {$v_filter}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} OR {$r_filter}&lt;{$max?magR}) )</text>
 
     (: escape catalogs with / inside  (VizieR case):)
-    let $from := if($singlequery) then string-join($froms, " JOIN ") else $froms[1]
+    let $from := if($singlequery) then string-join($froms, "    JOIN    ") else $froms[1]
     let $from := if(contains($from, "/")) then '"'||$from||'"' else $from
 
     let $numerical_epoch := try{let $num := xs:double($cat?epoch) return true() }catch*{false()}
@@ -653,6 +672,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         {$mags[not($singlequery)]}
     FROM
         TAP_UPLOAD.step2 as step2
+        JOIN {$froms[1]} USING (source_id)
         JOIN {$froms[2]}
     </text>
 
