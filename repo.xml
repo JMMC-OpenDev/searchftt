@@ -14,8 +14,10 @@
   <changelog xmlns="">
      <change version="1.5">
       <ul>
-        <li>Refactor bulk mode code to support big catalog queries in two step (position and magnitudes constraints).</li>      
-        <li>Format decimal values (3 digits).</li>  
+        <li>Replace comma separator by semicolon to enter multiple identifiers.</li>
+        <li>Refactor bulk mode code to support big catalog queries in two steps (position followed by magnitudes constraints).</li>
+        <li>Resolve names and coordinates in batch mode for huge speedup on long target lists.</li>
+        <li>Format decimal values (3 digits) in result tables.</li>
       </ul>
     </change>
      <change version="1.4">
