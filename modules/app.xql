@@ -295,12 +295,12 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
     let $fov_deg := 3 * $max?dist_as div 3600
 
     let $ids := distinct-values($identifiers ! tokenize(., ";") ! normalize-space(.))[string-length()>0]
-    let $ids2names := app:resolve-by-names($identifiers)
+    let $id2target := app:resolve-by-names($ids)
     let $count := count($ids)
     let $lis :=
         for $id at $pos in $ids
-        let $log := util:log("info", <txt>loop {$pos} / {$count}</txt>)
-        let $s := app:resolve-by-name($id)
+        let $s := map:get($id2target, $id)
+        let $log := util:log("info", <txt>loop {$pos} / {$count} : {$id} {$s} </txt>)
         let $simbad-link := if($s/@position-only) then <a target="_blank" href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={encode-for-uri($id)}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec">{$id}</a> else <a target="_blank" href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}">{$id}</a>
         let $ra := $s/ra let $dec := $s/dec
         let $info := if(exists($s/ra))then
@@ -417,10 +417,15 @@ declare function app:search($id, $max, $s, $cat) {
                     <th>GetStar</th>
                 </tr></thead>
                 {
-                    for $tr in $votable//*:TABLEDATA/* return
+                    let $trs := $votable//*:TABLEDATA/*
+                    (: compute simbad id adding a prefix to build a valid identifier :)
+                    let $targets-ids := $trs/*[$source_id_idx]!concat($cat?simbad_prefix_id, .)
+                    let $id2target := app:resolve-by-names($targets-ids)
+                    for $tr in $trs return
                         <tr>{
                             let $simbad_id := $cat?simbad_prefix_id||$tr/*[$source_id_idx]
-                            let $simbad := jmmc-simbad:resolve-by-name($simbad_id)
+                            let $simbad := map:get($id2target, $simbad_id)
+
                             let $target_link := if ($simbad/ra) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
                                 let $ra := $tr/*[index-of($field_names, "ra")]
                                 let $dec := $tr/*[index-of($field_names, "dec")]
@@ -553,9 +558,25 @@ declare function app:bulk-search($input-votable, $max, $cat) {
                 {util:log("error", data($votable))}
             </div>
         else
+            let $field_names := for $e in $votable//*:FIELD/@name return lower-case($e)
+            let $source_id_idx := index-of($field_names, "source_id")
+            let $trs := $votable//*:TR
+            (: compute simbad id adding a prefix to build a valid identifier :)
+            let $targets-ids := $trs/*[$source_id_idx]!concat($cat?simbad_prefix_id, .)
+            let $id2target := app:resolve-by-names($targets-ids)
+
+            return        
             <table class="table table-light table-bordered datatable">
-                <thead><tr>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{data($field/@name)}</th>}</tr></thead>
-                {for $trs in $votable//*:TR return <tr>{for $td in $trs/*:TD return <td>{data($td)}</td>}</tr>}
+                <thead><tr><th>Simbad</th>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{data($field/@name)}</th>}</tr></thead>
+                {for $tr in $trs 
+                    let $simbad_id := $cat?simbad_prefix_id||$tr/*[$source_id_idx]
+                    let $simbad := map:get($id2target, $simbad_id)
+                    let $target_link := if ($simbad/ra) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
+                                let $ra := $tr/*[index-of($field_names, "ra")]
+                                let $dec := $tr/*[index-of($field_names, "dec")]
+                                return <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$simbad_id}">{replace($simbad_id," ","&#160;")}</a>
+        
+                    return <tr><td>{$target_link}</td>{for $td in $tr/*:TD return <td>{data($td)}</td>}</tr>}
             </table>
 
     let $log := util:log("info", "done ("||seconds-from-duration(util:system-time()-$start-time)||"s)")
