@@ -24,7 +24,8 @@ declare variable $app:json-conf :='{
         "max_magK_AT" : 10,
         "max_magR" : 12.5,
         "max_dist_as" : 30,
-        "max_rec" : 25
+        "max_rec" : 25,
+        "max_result_table_rows" : 1000
     },
     "extended-cols" : [ "pmra", "pmdec", "pmde", "epoch", "cat_dist_as", "today_dist_as"],
     "samestar-dist_deg" : 2.78E-4,
@@ -170,7 +171,7 @@ declare function app:defaults() as map(*){
 };
 
 declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*), $identifiers as xs:string*) {
-    let $toggle-classes := map{ "extcats" : "extended catalogs", "extcols" : "extended columns", "extquery" : "queries", "exttable" : "hide table", "extorphan" : "hide orphan", "extdebug" : "debug" }
+    let $toggle-classes := map{ "extcats" : "extended catalogs", "extcols" : "extended columns", "extquery" : "queries", "exttable" : "hide tables", "extorphan" : "hide orphans", "extdebug" : "debug" }
     return
         <li class="nav-link">{
             map:for-each( $toggle-classes, function ($k, $label) {
@@ -241,7 +242,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
         </p>
         <form>
             <div class="p-3 input-group mb-3 ">
-                <input type="text" class="form-control" placeholder="Science identifiers (semicolon separator) e.g.: HD123;HD345;HD456" aria-label="Science identifiers (semicolon separator)" aria-describedby="b2"
+                <input type="text" class="form-control" placeholder="Science identifiers (semicolon separator) e.g : 0 0; 4.321 6.543; HD123; HD234" aria-label="Science identifiers (semicolon separator)" aria-describedby="b2"
                 id="identifiers" name="identifiers" value="{$identifiers}" required=""/>
                 <button class="btn btn-outline-secondary" type="submit" id="b2"><i class="bi bi-search"/></button>
             </div>
@@ -285,7 +286,11 @@ declare function app:resolve-by-names($name-or-coords) {
     
     let $map := map:merge((
         for $c in $coords return map:entry($c, app:fake-target($c))
-        ,jmmc-simbad:resolve-by-names($names)
+        ,
+        if(exists(request:get-parameter("dry", ()))) then
+            ()
+        else
+            jmmc-simbad:resolve-by-names($names)
     ))
     return $map
 };
@@ -566,9 +571,9 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             let $id2target := app:resolve-by-names($targets-ids)
 
             return        
-            <table class="table table-light table-bordered datatable">
+            <table class="table table-light table-bordered datatable exttable">
                 <thead><tr><th>Simbad</th>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{data($field/@name)}</th>}</tr></thead>
-                {for $tr in $trs 
+                {for $tr in subsequence($trs,1,$max?result_table_rows) 
                     let $simbad_id := $cat?simbad_prefix_id||$tr/*[$source_id_idx]
                     let $simbad := map:get($id2target, $simbad_id)
                     let $target_link := if ($simbad/ra) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
@@ -580,14 +585,23 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             </table>
 
     let $log := util:log("info", "done ("||seconds-from-duration(util:system-time()-$start-time)||"s)")
-
+    let $nb_rows := count($votable//*:TR)
+    let $csv := string-join(
+        (
+            string-join($table/thead[1]//th,";"),
+            for $tr in $table/tr return string-join($tr/td,";")
+        ),"&#10;"
+        )
     return
         <div class="{if($cat?main_cat) then () else "extcats d-none"}">
-        <h3>{$cat?cat_name} ({count($table//tr[td])})</h3>
-        {$table}
-        {(: <a href="data:application/x-votable+xml;base64,YOURBASE64DATA" type="application/x-votable+xml">Download VOTABLE</a> :)}        
+        <h3>
+            {$cat?cat_name} ({$nb_rows})&#160;
+            <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="searchftt_{$cat?cat_name}.vot">votable</a>&#160;
+            <a class="btn btn-outline-secondary btn-sm" href="data:text/csv;base64,{util:base64-encode(serialize($csv))}" type="text/csv" download="searchftt_{$cat?cat_name}.csv">csv</a>
+         </h3>        
+        { $table }
         {$query-code}
-        {<code class="extdebug d-none"><br/>{serialize($votable)}<br/> Duration for this catalog : {seconds-from-duration(util:system-time()-$start-time)}s</code>}
+        {<code class="extdebug d-none"><br/>Catalog query duration : {seconds-from-duration(util:system-time()-$start-time)}s</code>}
         </div>
 };
 
@@ -601,7 +615,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $pmra := if($votname) then $votname||".my_pmra" else try{ xs:double($s/pmra) } catch * {0}
     let $pmdec := if($votname) then $votname||".my_pmdec" else try{ xs:double($s/pmdec) } catch * {0}
     let $upload-from := if($votname) then "TAP_UPLOAD."||$votname|| " as " ||$votname||", " else ()
-    let $science-name-col := if($votname) then $votname||".my_name as science, " else ()
+    let $science-name-col := if($votname) then $votname||".my_user_identifier as science, " else ()
     let $order-by := if($votname) then "science," else ()
 
     (: We could have built query with COALESCE to replace missing pmra by 0, but:
@@ -626,8 +640,8 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $v_filter := if ($vmag) then $vmag else <text>( {$cat?mag_g } - ( -0.0176 - 0.00686* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1732*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
     let $r_filter := if ($rmag) then $rmag else <text>( {$cat?mag_g } - ( 0.003226 + 0.3833* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1345*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
     let $max-mag-filters := <text>( ({$cat?mag_k }&lt;{$max?magK_UT} AND {$v_filter}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} AND {$r_filter}&lt;{$max?magR}) )</text>
-    let $amax-mag-filters := <text>( ({$cat?mag_k }&lt;{$max?magK_UT} OR {$v_filter}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} OR {$r_filter}&lt;{$max?magR}) )</text>
-
+    let $max-mag-filters := <text>( ({$cat?mag_k }&lt;{$max?magK_UT} OR {$v_filter}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} OR {$r_filter}&lt;{$max?magR}) )</text>
+    
     (: escape catalogs with / inside  (VizieR case):)
     let $from := if($singlequery) then string-join($froms, "    JOIN    ") else $froms[1]
     let $from := if(contains($from, "/")) then '"'||$from||'"' else $from
@@ -680,7 +694,6 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         {$upload-from} {$from}
     WHERE
         {$positional-xmatch}
-
         {" AND "[$singlequery]}
         {$max-mag-filters[$singlequery]}
     ORDER BY
@@ -695,6 +708,9 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         TAP_UPLOAD.step2 as step2
         JOIN {$froms[1]} USING (source_id)
         JOIN {$froms[2]}
+    WHERE
+        {$max-mag-filters[not($singlequery)]}
+
     </text>
 
     return
