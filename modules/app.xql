@@ -431,7 +431,7 @@ declare function app:search($id, $max, $s, $cat) {
                             let $simbad_id := $cat?simbad_prefix_id||$tr/*[$source_id_idx]
                             let $simbad := map:get($id2target, $simbad_id)
 
-                            let $target_link := if ($simbad/ra) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
+                            let $target_link := if (exists($simbad/ra/text())) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
                                 let $ra := $tr/*[index-of($field_names, "ra")]
                                 let $dec := $tr/*[index-of($field_names, "dec")]
                                 return <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$simbad_id}">{replace($simbad_id," ","&#160;")}</a>
@@ -576,7 +576,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
                 {for $tr in subsequence($trs,1,$max?result_table_rows) 
                     let $simbad_id := $cat?simbad_prefix_id||$tr/*[$source_id_idx]
                     let $simbad := map:get($id2target, $simbad_id)
-                    let $target_link := if ($simbad/ra) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
+                    let $target_link := if (exists($simbad/ra/text())) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
                                 let $ra := $tr/*[index-of($field_names, "ra")]
                                 let $dec := $tr/*[index-of($field_names, "dec")]
                                 return <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$simbad_id}">{replace($simbad_id," ","&#160;")}</a>
