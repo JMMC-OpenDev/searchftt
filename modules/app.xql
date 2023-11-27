@@ -17,6 +17,9 @@ import module namespace jmmc-simbad="http://exist.jmmc.fr/jmmc-resources/simbad"
 (:import module namespace jmmc-astro="http://exist.jmmc.fr/jmmc-resources/astro" at "/db/apps/jmmc-resources/content/jmmc-astro.xql";:) (: WARNING this module require to enable eXistDB's Java Binding :)
 
 (: Main config to unify catalog accross their colnames or simbad :)
+(: HINTS:
+    - prefer lower_case colnames since some backend rewrite to lower case input colnames
+:)
 declare variable $app:json-conf :='{
     "default":{
         "max_magV" : 15,
@@ -469,8 +472,8 @@ declare function app:get-identifiers-from-file($indentifiersFile as xs:string*){
     if (exists($indentifiersFile)) then
         for $i in distinct-values($indentifiersFile)
             (: let $log := util:log("info", "identifiersFile[" || $i || "]:"|| request:get-uploaded-file-data("indentifiersFile") ) :)
-            return "a"             
-    else ()    
+            return "a"
+    else ()
 };
 
 declare %templates:wrap function app:bulk-form($node as node(), $model as map(*), $identifiers as xs:string*, $format as xs:string*, $catalogs as xs:string*, $indentifiersFile as xs:string*) {
@@ -483,10 +486,10 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
     let $max-inputs :=  map:for-each( $max-mags, function ($k, $v) {
             <div class="p-2"><div class="input-group">
                  <span class="input-group-text">{$k}</span>
-                 <input name="max_{$k}" value="{$v}" class="form-control"/> 
-                 
+                 <input name="max_{$k}" value="{$v}" class="form-control"/>
+
             </div></div>
-            }) 
+            })
     let $default-catalogs := for $cat in $app:conf?catalogs?* where exists($cat?bulk) order by $cat?main_cat descending return $cat?cat_name
     let $user-catalogs := request:get-parameter("catalogs", ())
     let $cats-params := for $catalog in $default-catalogs
@@ -496,7 +499,7 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
                 { element input { attribute class {"form-check-input"}, attribute type {"checkbox"}, attribute name {"catalogs"}, attribute value {$catalog}, if (empty($user-catalogs) or $catalog=$user-catalogs) then attribute checked {"true"}  else ()} }
             </div>    <span class="form-control">{$catalog}</span>
             </div></div>
-    let $user-catalogs := if( exists($user-catalogs) ) then $user-catalogs else $default-catalogs    
+    let $user-catalogs := if( exists($user-catalogs) ) then $user-catalogs else $default-catalogs
     let $identifiers-from-file := app:get-identifiers-from-file($indentifiersFile)
     return
     (
@@ -506,26 +509,26 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
             <div class="d-flex p-2">
             <div class="input-group">
                 <input type="text" class="form-control" placeholder="Enter your science identifiers or coordinates. Use semicolon as separator, e.g : 0 0; 4.321 6.543; HD123; HD234 " aria-label="Science identifiers (semicolon separator)" id="identifiers" name="identifiers" value="{$identifiers}"/>
-            </div>              
+            </div>
             <!--
             Disabled waiting for a solution that accept  enctype="multipart/form-data" forms ( without templating ?)
             <div class="input-group mb-2">
                 <span class="input-group-text" id="indentifiersFileDesc">... or provide an input file</span>
                 <input type="file" class="form-control" id="indentifiersFile"  name="indentifiersFile" aria-describedby="indentifiersFileDesc" />
             </div>
-            -->            
-            </div>          
+            -->
+            </div>
             <div class="d-flex p-2"><div class="p-2 justify-content-end"><label class="form-check-label ">Catalogs to query:</label></div>
                 {$cats-params}
-            </div>         
-            
+            </div>
+
             <div class="d-flex p-2"><div class="p-2 justify-content-end">Limit magnitudes:</div>
                 {$max-inputs}
             </div>
             <div class="d-flex p-2">
                 <div class="col-sm-2"><input type="submit" class="btn btn-primary"/></div>
                 <div class="col-sm-2"><a href="bulk.html" class="btn btn-outline-secondary" role="button"> Reset <i class="bi bi-arrow-clockwise"></i></a></div>
-            </div>            
+            </div>
         </form>
     </div>
     ,
@@ -547,7 +550,18 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
         {$trs}
         </table>
     let $votable := jmmc-tap:table2votable($table, "targets")
-    let $targets :=<div><h3>Your { count($table//tr[td]) } targets </h3>{$table}</div>
+
+     let $csv := string-join(
+        (
+            string-join($table/thead[1]//th,";"),
+            for $tr in $table/tr return string-join($tr/td,";")
+        ),"&#10;"
+        )
+    let $targets :=<div><h3>Your { count($table//tr[td]) } targets
+        <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="input.vot">votable</a>&#160;
+        <a class="btn btn-outline-secondary btn-sm" href="data:text/csv;base64,{util:base64-encode(serialize($csv))}" type="text/csv" download="input.csv">csv</a>
+
+        </h3>{$table}</div>
 
     let $res-tables :=  for $cat-name in $catalogs-to-query
         let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
@@ -580,7 +594,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
                 if (count($query)=1) then
                     jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $input-votable, $max-rec, $cat?tap_format)
                 else
-                    let $input-votable2 := jmmc-tap:tap-adql-query($cat?tap_endpoint,$query[1], $input-votable, $max-rec, $cat?tap_format)
+                    let $input-votable2 := jmmc-tap:tap-adql-query($cat?tap_endpoint,$query[1], $input-votable, $max-rec*10000, $cat?tap_format)
                     return
                         if( $input-votable2/error or $input-votable2//*:INFO[@name="QUERY_STATUS" and @value="ERROR"] )
                         then
@@ -596,6 +610,13 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             <div class="alert alert-danger" role="alert">
                 Error trying to get votable.<br/>
                 <pre>{data($votable)}</pre>
+                {util:log("error", data($votable))}
+            </div>
+        else if(not ( contains(lower-case(name($votable/*)),"votable") ) ) (: TODO throw an exception for this case on jmmc-tap side :)
+        then
+            <div class="alert alert-danger" role="alert">
+                Error trying to get votable (maybe html ? '{lower-case(name($votable/*))}') : <br/>
+                {$votable}
                 {util:log("error", data($votable))}
             </div>
         else
@@ -732,8 +753,10 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     SELECT
         {$science-name-col}
         {$cat?source_id} as source_id,
-        {$distance_J2000},        
-        {$distance_catalog},    
+        {$distance_J2000},
+        {$distance_catalog},
+        0 as ut_flag,
+        0 as at_flag,
         {$cat?ra} as ra, {$cat?dec} as dec,
         {$cat?pmra}, {$cat?pmdec},
         {$cat?epoch} as epoch{","[$singlequery]}
