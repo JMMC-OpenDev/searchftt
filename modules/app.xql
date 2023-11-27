@@ -186,24 +186,24 @@ declare function app:datatable-script(){
     <script type="text/javascript">
         var formatTable = true; // TODO enhance table metadata so we rely on it and limit formating on some columns
         $(document).ready(function() {{
-        $('.datatable').DataTable( {{            
+        $('.datatable').DataTable( {{
             /* */
             "aoColumnDefs": [
             {{
                 "targets": '_all',
-                "mRender": function ( data, type, row ) {{      
-                    if(type == "display" &amp;&amp; formatTable ){{                                        
+                "mRender": function ( data, type, row ) {{
+                    if(type == "display" &amp;&amp; formatTable ){{
                         fdata=parseFloat(Number(data))
                         if(isNaN(fdata) || data % 1 == 0){{
                             return data;
-                        }}                    
-                        return fdata.toFixed(3);                                                   
-                    }} 
+                        }}
+                        return fdata.toFixed(3);
+                    }}
                     return data;
-                }}                                    
+                }}
             }},
-            ],            
-            "paging": false,"searching":false,"info": false,"order": []
+            ],
+            "paging": true,"searching":true,"info": false,"order": []
         }});
 
         }});
@@ -283,7 +283,7 @@ declare function app:resolve-by-name($name-or-coords) {
 declare function app:resolve-by-names($name-or-coords) {
     let  $names := $name-or-coords[matches(., "[a-z]", "i")]
     let $coords := $name-or-coords[not(matches(., "[a-z]", "i"))] (: should we check for :)
-    
+
     let $map := map:merge((
         for $c in $coords return map:entry($c, app:fake-target($c))
         ,
@@ -465,42 +465,78 @@ declare function app:search($id, $max, $s, $cat) {
         </div>
 };
 
-declare %templates:wrap function app:bulk-form($node as node(), $model as map(*), $identifiers as xs:string*, $format as xs:string*, $catalogs as xs:string*) {
+declare function app:get-identifiers-from-file($indentifiersFile as xs:string*){
+    if (exists($indentifiersFile)) then
+        for $i in distinct-values($indentifiersFile)
+            (: let $log := util:log("info", "identifiersFile[" || $i || "]:"|| request:get-uploaded-file-data("indentifiersFile") ) :)
+            return "a"             
+    else ()    
+};
+
+declare %templates:wrap function app:bulk-form($node as node(), $model as map(*), $identifiers as xs:string*, $format as xs:string*, $catalogs as xs:string*, $indentifiersFile as xs:string*) {
     let $defaults := app:defaults()
     let $max := $defaults("max")
-    let $params :=  for $p in request:get-parameter-names() where not ( $p=("identifiers", "catalogs") ) return <input type="hidden" name="{$p}" value="{request:get-parameter($p,' ')}"/>
+    let $max-mags := map:merge( map:for-each( $max, function($k,$v){ if ( starts-with($k,"mag") and not(ends-with($k,"info")) ) then map:entry($k,$v) else () } ) )
+    (: was here before max-mags to convey mags parameters
+        let $params :=  for $p in request:get-parameter-names() where not ( $p=("identifiers", "catalogs") ) return <input type="hidden" name="{$p}" value="{request:get-parameter($p,' ')}"/> :)
+
+    let $max-inputs :=  map:for-each( $max-mags, function ($k, $v) {
+            <div class="p-2"><div class="input-group">
+                 <span class="input-group-text">{$k}</span>
+                 <input name="max_{$k}" value="{$v}" class="form-control"/> 
+                 
+            </div></div>
+            }) 
     let $default-catalogs := for $cat in $app:conf?catalogs?* where exists($cat?bulk) order by $cat?main_cat descending return $cat?cat_name
     let $user-catalogs := request:get-parameter("catalogs", ())
     let $cats-params := for $catalog in $default-catalogs
         return
-            <div class="form-check form-check-inline">
+            <div class="p-2"><div class="input-group">
+            <div class="input-group-text">
                 { element input { attribute class {"form-check-input"}, attribute type {"checkbox"}, attribute name {"catalogs"}, attribute value {$catalog}, if (empty($user-catalogs) or $catalog=$user-catalogs) then attribute checked {"true"}  else ()} }
-                <label class="form-check-label">{$catalog}</label>
-            </div>
-    let $user-catalogs := if( exists($user-catalogs) ) then $user-catalogs else $default-catalogs
+            </div>    <span class="form-control">{$catalog}</span>
+            </div></div>
+    let $user-catalogs := if( exists($user-catalogs) ) then $user-catalogs else $default-catalogs    
+    let $identifiers-from-file := app:get-identifiers-from-file($indentifiersFile)
     return
     (
     <div>
-        <h1>Bulk form!</h1>
-        <p>This new form provide an efficient way to query a large number of targets.</p>
+        <h1>Bulk form for fast and efficient queries !</h1>
         <form method="post">
-            <div class="p-3 input-group mb-3 ">
-                <input type="text" class="form-control" placeholder="Science identifiers or coordinates (semicolon separator), e.g : 0 0; 4.321 6.543; HD123; HD234 " aria-label="Science identifiers (semicolon separator)" aria-describedby="b2"
-                id="identifiers" name="identifiers" value="{$identifiers}" required=""/>
-                <button class="btn btn-outline-secondary" type="submit" id="b2"><i class="bi bi-search"/></button>
+            <div class="d-flex p-2">
+            <div class="input-group">
+                <input type="text" class="form-control" placeholder="Enter your science identifiers or coordinates. Use semicolon as separator, e.g : 0 0; 4.321 6.543; HD123; HD234 " aria-label="Science identifiers (semicolon separator)" id="identifiers" name="identifiers" value="{$identifiers}"/>
+            </div>              
+            <!--
+            Disabled waiting for a solution that accept  enctype="multipart/form-data" forms ( without templating ?)
+            <div class="input-group mb-2">
+                <span class="input-group-text" id="indentifiersFileDesc">... or provide an input file</span>
+                <input type="file" class="form-control" id="indentifiersFile"  name="indentifiersFile" aria-describedby="indentifiersFileDesc" />
             </div>
-            {$params}{$cats-params}
+            -->            
+            </div>          
+            <div class="d-flex p-2"><div class="p-2 justify-content-end"><label class="form-check-label ">Catalogs to query:</label></div>
+                {$cats-params}
+            </div>         
+            
+            <div class="d-flex p-2"><div class="p-2 justify-content-end">Limit magnitudes:</div>
+                {$max-inputs}
+            </div>
+            <div class="d-flex p-2">
+                <div class="col-sm-2"><input type="submit" class="btn btn-primary"/></div>
+                <div class="col-sm-2"><a href="bulk.html" class="btn btn-outline-secondary" role="button"> Reset <i class="bi bi-arrow-clockwise"></i></a></div>
+            </div>            
         </form>
     </div>
     ,
-    if (exists($identifiers)) then ( app:searchftt-bulk-list($identifiers, $max, $user-catalogs), app:datatable-script()) else ()
+    if (exists($identifiers[string-length()>0])) then ( app:searchftt-bulk-list($identifiers, $max, $user-catalogs), app:datatable-script()) else ()
     )
 };
 
 declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map(*), $catalogs-to-query as xs:string* ) {
     let $ids := distinct-values($identifiers ! tokenize(., ";")!normalize-space(.))[string-length()>0]
     let $map := app:resolve-by-names($ids)
-    
+
     let $cols := $map?*[1]/* ! name(.)
     let $th := <tr> {$cols ! <th>{.}</th>}</tr>
     let $trs := for $star in $map?* order by $star
@@ -570,18 +606,18 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             let $targets-ids := $trs/*[$source_id_idx]!concat($cat?simbad_prefix_id, .)
             let $id2target := app:resolve-by-names($targets-ids)
 
-            return        
+            return
             <table class="table table-light table-bordered datatable exttable">
-                <thead><tr><th>Simbad</th>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{data($field/@name)}</th>}</tr></thead>
-                {for $tr in subsequence($trs,1,$max?result_table_rows) 
+                <thead><tr>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{data($field/@name)}</th>}</tr></thead>
+                {for $tr in subsequence($trs,1,$max?result_table_rows)
                     let $simbad_id := $cat?simbad_prefix_id||$tr/*[$source_id_idx]
                     let $simbad := map:get($id2target, $simbad_id)
                     let $target_link := if (exists($simbad/ra/text())) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
                                 let $ra := $tr/*[index-of($field_names, "ra")]
                                 let $dec := $tr/*[index-of($field_names, "dec")]
                                 return <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$simbad_id}">{replace($simbad_id," ","&#160;")}</a>
-        
-                    return <tr><td>{$target_link}</td>{for $td in $tr/*:TD return <td>{data($td)}</td>}</tr>}
+
+                    return <tr>{for $td at $pos in $tr/*:TD return <td>{if($pos=$source_id_idx) then $target_link else data($td)}</td>}</tr>}
             </table>
 
     let $log := util:log("info", "done ("||seconds-from-duration(util:system-time()-$start-time)||"s)")
@@ -598,7 +634,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             {$cat?cat_name} ({$nb_rows})&#160;
             <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="searchftt_{$cat?cat_name}.vot">votable</a>&#160;
             <a class="btn btn-outline-secondary btn-sm" href="data:text/csv;base64,{util:base64-encode(serialize($csv))}" type="text/csv" download="searchftt_{$cat?cat_name}.csv">csv</a>
-         </h3>        
+         </h3>
         { $table }
         {$query-code}
         {<code class="extdebug d-none"><br/>Catalog query duration : {seconds-from-duration(util:system-time()-$start-time)}s</code>}
@@ -621,17 +657,27 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     (: We could have built query with COALESCE to replace missing pmra by 0, but:
         GAVO does not support it inside a formulae and VizieR forbid it  :(
 
-        TODO simplify distance computation if we do not have any pm info ?
+        TODO simplify distance computation if we do not have any pm info or same epoch ?
     :)
+
     let $distance_J2000 := <dist_as>DISTANCE(
-        POINT( 'ICRS', {$cat?ra} - ( ({$cat?epoch}-2000.0) * {$cat?pmra} ) / 3600000.0, {$cat?dec} - ( ( {$cat?epoch}-2000.0) * {$cat?pmdec} ) / 3600000.0  )
-        ,POINT( 'ICRS', {$ra}, {$dec} )
+            POINT( 'ICRS', {$cat?ra} - ( ({$cat?epoch}-2000.0) * {$cat?pmra} ) / 3600000.0, {$cat?dec} - ( ( {$cat?epoch}-2000.0) * {$cat?pmdec} ) / 3600000.0  )
+            ,POINT( 'ICRS', {$ra}, {$dec} )
         )*3600.0 as j2000_dist_as</dist_as>
 
     let $distance_catalog := <dist_as>DISTANCE(
-        POINT('ICRS', {$cat?ra}, {$cat?dec})
-        ,POINT('ICRS', {$ra}-((2000.0-{$cat?epoch})*{$pmra})/3600000.0, {$dec}-((2000.0-{$cat?epoch})*{$pmdec})/3600000.0 )
+            POINT('ICRS', {$cat?ra}, {$cat?dec})
+            ,POINT('ICRS', {$ra}-((2000.0-{$cat?epoch})*{$pmra})/3600000.0, {$dec}-((2000.0-{$cat?epoch})*{$pmdec})/3600000.0 )
         )*3600.0 as cat_dist_as</dist_as>
+
+    (:
+    could be more reliable but does not seem to change a lot
+    let $date-epoch := 2024
+    let $distance_jdate := <dist_as>DISTANCE(
+            POINT( 'ICRS', {$cat?ra} - ( ({$cat?epoch}-{$date-epoch}) * {$cat?pmra} ) / 3600000.0, {$cat?dec} - ( ( {$cat?epoch}-{$date-epoch}) * {$cat?pmdec} ) / 3600000.0  )
+            ,POINT('ICRS', {$ra}-((2000.0-{$date-epoch})*{$pmra})/3600000.0, {$dec}-((2000.0-{$date-epoch})*{$pmdec})/3600000.0 )
+        )*3600.0 as jdate_dist_as</dist_as>
+    :)
 
     let $vmag := $cat?mag_v
     let $rmag := $cat?mag_r
@@ -641,11 +687,12 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $r_filter := if ($rmag) then $rmag else <text>( {$cat?mag_g } - ( 0.003226 + 0.3833* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1345*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
     let $max-mag-filters := <text>( ({$cat?mag_k }&lt;{$max?magK_UT} AND {$v_filter}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} AND {$r_filter}&lt;{$max?magR}) )</text>
     let $max-mag-filters := <text>( ({$cat?mag_k }&lt;{$max?magK_UT} OR {$v_filter}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} OR {$r_filter}&lt;{$max?magR}) )</text>
-    
+
     (: escape catalogs with / inside  (VizieR case):)
     let $from := if($singlequery) then string-join($froms, "    JOIN    ") else $froms[1]
     let $from := if(contains($from, "/")) then '"'||$from||'"' else $from
 
+    (: compute science position in catalog epoch so we can compute crossmatch even if we do not have PM (inputs always have 0 for unknown PMs) :)
     let $numerical_epoch := try{let $num := xs:double($cat?epoch) return true() }catch*{false()}
     let $ra_in_cat := if($numerical_epoch) then <ra>{$ra}-((2000.0-{$cat?epoch})*{$pmra})/3600000.0</ra> else $ra
     let $dec_in_cat := if($numerical_epoch) then <dec>{$dec}-((2000.0-{$cat?epoch})*{$pmdec})/3600000.0</dec> else $dec
@@ -671,6 +718,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $flags := <text>{$cat?mag_k }&lt;{$max?magK_UT} , {$v_filter}&lt;{$max?magV} , {$cat?mag_k }&lt;{$max?magK_AT} , {$r_filter}&lt;{$max?magR} , </text>
     :)
 
+    (: cross match must be done in the catalog epoch to retrieve candidates without PM :)
     (: /!\ VizieR will never end the processing if we do not put the input position in the POINT :)
     let $positional-xmatch := <position>CONTAINS( POINT('ICRS', {$cat?ra}, {$cat?dec}), CIRCLE('ICRS', {$ra_in_cat}, {$dec_in_cat}, {$max?dist_as}/3600.0) ) = 1</position>
 
@@ -684,8 +732,8 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     SELECT
         {$science-name-col}
         {$cat?source_id} as source_id,
-        {$distance_J2000},
-        {$distance_catalog},
+        {$distance_J2000},        
+        {$distance_catalog},    
         {$cat?ra} as ra, {$cat?dec} as dec,
         {$cat?pmra}, {$cat?pmdec},
         {$cat?epoch} as epoch{","[$singlequery]}
