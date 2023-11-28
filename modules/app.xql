@@ -16,10 +16,15 @@ import module namespace jmmc-tap="http://exist.jmmc.fr/jmmc-resources/tap" at "/
 import module namespace jmmc-simbad="http://exist.jmmc.fr/jmmc-resources/simbad" at "/db/apps/jmmc-resources/content/jmmc-simbad.xql";
 (:import module namespace jmmc-astro="http://exist.jmmc.fr/jmmc-resources/astro" at "/db/apps/jmmc-resources/content/jmmc-astro.xql";:) (: WARNING this module require to enable eXistDB's Java Binding :)
 
-(: Main config to unify catalog accross their colnames or simbad :)
-(: HINTS:
+(: DEV HINTS:
     - prefer lower_case colnames since some backend rewrite to lower case input colnames
+    - we could refactor with a map that would store column names so we replace and avoid use of error prone strings searching for come columns
+    - we could extend the default map (and rename it to config ? ) so we can store more than max values and associate for each of them more metadata : desc, displayorder...)
 :)
+
+
+
+(: Main config to unify catalog accross their colnames or simbad :)
 declare variable $app:json-conf :='{
     "default":{
         "max_magV" : 15,
@@ -260,7 +265,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
 declare %private function app:fake-target($coords) {
     let $coord := $coords => replace( "\+", " +") => replace ("\-", " -")
     let $t := for $e in tokenize($coord, " ")[string-length(.)>0]  return $e
-        return <target position-only="y"><name>{normalize-space($coords)}</name><ra>{$t[1]}</ra><dec>{$t[2]}</dec><pmra>0.0</pmra><pmdec>0.0</pmdec></target>
+        return <target position-only="y"><user_identifier>{normalize-space($coords)}</user_identifier><name>{normalize-space($coords)}</name><ra>{$t[1]}</ra><dec>{$t[2]}</dec><pmra>0.0</pmra><pmdec>0.0</pmdec></target>
 };
 
 (:~
@@ -532,7 +537,13 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
         </form>
     </div>
     ,
-    if (exists($identifiers[string-length()>0])) then ( app:searchftt-bulk-list($identifiers, $max, $user-catalogs), app:datatable-script()) else ()
+    if (exists($identifiers[string-length()>0])) then
+        (
+            app:searchftt-bulk-list($identifiers, $max, $user-catalogs),
+            app:datatable-script(),
+            <p><i class="bi bi-info-circle-fill"></i> <kbd>Shift</kbd> click in the column order buttons to combine a multi column sorting.</p>
+        )
+    else ()
     )
 };
 
@@ -621,7 +632,14 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             </div>
         else
             let $field_names := for $e in $votable//*:FIELD/@name return lower-case($e)
+            let $science_idx := index-of($field_names, "science")
             let $source_id_idx := index-of($field_names, "source_id")
+            let $mag_k_idx := index-of($field_names, "mag_ks")
+            let $mag_v_idx := (index-of($field_names, "mag_v"),index-of($field_names, "computed_mag_v"))
+            let $mag_r_idx := (index-of($field_names, "mag_r"),index-of($field_names, "computed_mag_r"))
+            let $at_flag_idx := index-of($field_names, "at_flag")
+            let $ut_flag_idx := index-of($field_names, "ut_flag")
+
             let $trs := $votable//*:TR
             (: compute simbad id adding a prefix to build a valid identifier :)
             let $targets-ids := $trs/*[$source_id_idx]!concat($cat?simbad_prefix_id, .)
@@ -630,15 +648,44 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             return
             <table class="table table-light table-bordered datatable exttable">
                 <thead><tr>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{data($field/@name)}</th>}</tr></thead>
-                {for $tr in subsequence($trs,1,$max?result_table_rows)
+                {for $src_tr in subsequence($trs,1,$max?result_table_rows) group by $science := $src_tr/*:TD[$science_idx]
+                    return for $tr in $src_tr
                     let $simbad_id := $cat?simbad_prefix_id||$tr/*[$source_id_idx]
                     let $simbad := map:get($id2target, $simbad_id)
                     let $target_link := if (exists($simbad/ra/text())) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
                                 let $ra := $tr/*[index-of($field_names, "ra")]
                                 let $dec := $tr/*[index-of($field_names, "dec")]
                                 return <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$simbad_id}">{replace($simbad_id," ","&#160;")}</a>
+                    (: Compute flags :)
+                    let $magk := number($tr/*[$mag_k_idx])
+                    (: AT :)
+                    let $magr := number($tr/*[$mag_r_idx])
+                    let $magr_flag := if ($magr<$max?magR) then 2 else 0
+                    let $at_flag  :=  if ($magk<$max?magK_AT) then $magr_flag+1 else $magr_flag
+                    (: UT :)
+                    let $magv := number($tr/*[$mag_v_idx])
+                    let $magv_flag := if ($magv<$max?magV) then 2 else 0
+                    let $ut_flag  :=  if ($magk<$max?magK_UT) then $magv_flag+1 else $magv_flag
 
-                    return <tr>{for $td at $pos in $tr/*:TD return <td>{if($pos=$source_id_idx) then $target_link else data($td)}</td>}</tr>}
+                    return <tr>
+                            {for $td at $pos in $tr/*:TD
+                            return <td>{
+                                switch($pos)
+                                    case $source_id_idx return $target_link
+                                    case $mag_k_idx return
+                                        (attribute {"class"} {if ($magk<$max?magK_AT) then "table-success" else if ($magk<$max?magK_UT) then "table-warning" else "table-danger"}, data($td))
+                                    case $mag_v_idx return
+                                        (attribute {"class"} {if ($magv<$max?magV) then "table-success" else "table-danger"}, data($td))
+                                    case $mag_r_idx return
+                                        (attribute {"class"} {if ($magr<$max?magR) then "table-success" else "table-danger"}, data($td))
+                                    case $at_flag_idx return
+                                        $at_flag
+                                    case $ut_flag_idx return
+                                        $ut_flag
+                                    default return data($td)
+                            }</td>}
+                        </tr>
+                }
             </table>
 
     let $log := util:log("info", "done ("||seconds-from-duration(util:system-time()-$start-time)||"s)")
@@ -656,6 +703,11 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="searchftt_{$cat?cat_name}.vot">votable</a>&#160;
             <a class="btn btn-outline-secondary btn-sm" href="data:text/csv;base64,{util:base64-encode(serialize($csv))}" type="text/csv" download="searchftt_{$cat?cat_name}.csv">csv</a>
          </h3>
+        <p>By now, the ut_flag and at_flag columns are not computed in the votable but the table below ( 1=FT, 2=AO, 3=FT or AO). Magnitudes columns colors are for
+            <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-success bg-opacity-10 border border-success border-opacity-10 rounded-2">UT and AT compliancy</small>,
+            <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-warning bg-opacity-10 border border-warning border-opacity-10 rounded-2">UT compliancy</small> or
+            <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-danger bg-opacity-10 border border-danger border-opacity-10 rounded-2">not compatible / unknown</small>
+        </p>
         { $table }
         {$query-code}
         {<code class="extdebug d-none"><br/>Catalog query duration : {seconds-from-duration(util:system-time()-$start-time)}s</code>}
@@ -693,12 +745,13 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
 
     (:
     could be more reliable but does not seem to change a lot
+    :)
     let $date-epoch := 2024
     let $distance_jdate := <dist_as>DISTANCE(
             POINT( 'ICRS', {$cat?ra} - ( ({$cat?epoch}-{$date-epoch}) * {$cat?pmra} ) / 3600000.0, {$cat?dec} - ( ( {$cat?epoch}-{$date-epoch}) * {$cat?pmdec} ) / 3600000.0  )
             ,POINT('ICRS', {$ra}-((2000.0-{$date-epoch})*{$pmra})/3600000.0, {$dec}-((2000.0-{$date-epoch})*{$pmdec})/3600000.0 )
-        )*3600.0 as jdate_dist_as</dist_as>
-    :)
+        )*3600.0 as j2024_dist_as</dist_as>
+    (: :)
 
     let $vmag := $cat?mag_v
     let $rmag := $cat?mag_r
@@ -706,8 +759,9 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
 
     let $v_filter := if ($vmag) then $vmag else <text>( {$cat?mag_g } - ( -0.0176 - 0.00686* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1732*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
     let $r_filter := if ($rmag) then $rmag else <text>( {$cat?mag_g } - ( 0.003226 + 0.3833* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1345*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
-    let $max-mag-filters := <text>( ({$cat?mag_k }&lt;{$max?magK_UT} AND {$v_filter}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} AND {$r_filter}&lt;{$max?magR}) )</text>
-    let $max-mag-filters := <text>( ({$cat?mag_k }&lt;{$max?magK_UT} OR {$v_filter}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} OR {$r_filter}&lt;{$max?magR}) )</text>
+    let $max-mag-filters := if($votname)
+        then <text>({$cat?mag_k }&lt;{max((number($max?magK_UT), number($max?magK_AT)))} OR {$v_filter}&lt;{$max?magV} OR {$r_filter}&lt;{$max?magR})</text>
+        else <text>( ({$cat?mag_k }&lt;{$max?magK_UT} AND {$v_filter}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} AND {$r_filter}&lt;{$max?magR}) )</text>
 
     (: escape catalogs with / inside  (VizieR case):)
     let $from := if($singlequery) then string-join($froms, "    JOIN    ") else $froms[1]
@@ -728,10 +782,10 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     :)
 
     let $mags := string-join((
-        <m>{$cat?mag_k} as mag_ks</m>
-        ,<m>{$cat?mag_g} as mag_g</m>[$cat?mag_g]
-        ,<m>{$v_filter} as {$computed_prefix}mag_v</m>
+        <m>{$v_filter} as {$computed_prefix}mag_v</m>
         ,<m>{$r_filter} as {$computed_prefix}mag_r</m>
+        ,<m>{$cat?mag_k} as mag_ks</m>
+        ,<m>{$cat?mag_g} as mag_g</m>[$cat?mag_g]
         ,map:for-each( $cat?detail, function ($i, $j) { $i || ' AS ' ||$j})
         ), ",&#10;        ")
 
@@ -755,6 +809,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         {$cat?source_id} as source_id,
         {$distance_J2000},
         {$distance_catalog},
+        {$distance_jdate},
         0 as ut_flag,
         0 as at_flag,
         {$cat?ra} as ra, {$cat?dec} as dec,
@@ -765,8 +820,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         {$upload-from} {$from}
     WHERE
         {$positional-xmatch}
-        {" AND "[$singlequery]}
-        {$max-mag-filters[$singlequery]}
+        {string-join(("","  AND",$max-mag-filters)[$singlequery] ,"&#10;        ")}
     ORDER BY
         {$order-by} j2000_dist_as
     </text>
