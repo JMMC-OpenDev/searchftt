@@ -16,8 +16,10 @@
       <ul>
         <li>Replace comma separator by semicolon to enter multiple identifiers.</li>
         <li>Refactor bulk mode code to support big catalog queries in two steps (position followed by magnitudes constraints).</li>
+        <li>Bulk mode recovers AO or FT targets even if sources do not respond to both constraints.</li>
         <li>Resolve names and coordinates in batch mode for huge speedup on long target lists.</li>
         <li>Format decimal values (3 digits) in result tables.</li>
+        <li>Enable paging and search in bulk tables.</li>
       </ul>
     </change>
      <change version="1.4">
