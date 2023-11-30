@@ -32,6 +32,7 @@ declare variable $app:json-conf :='{
         "max_magK_AT" : 10,
         "max_magR" : 12.5,
         "max_dist_as" : 30,
+        "max_declinaison" : 40,
         "max_rec" : 25,
         "max_result_table_rows" : 1000
     },
@@ -211,7 +212,13 @@ declare function app:datatable-script(){
                 }}
             }},
             ],
-            "paging": true,"searching":true,"info": false,"order": []
+            "paging": true,"searching":true,"info": false,"order": [],
+            "dom": 'Bfrtip',
+            "buttons": ['pageLength', 'colvis','csv','copy'  ],
+            "lengthMenu": [
+                [10, 25, 50, 100, -1],
+                [10, 25, 50, 100, "All"]],
+            "iDisplayLength": 25
         }});
 
         }});
@@ -234,7 +241,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
                 <li>Main catalogs<ul>{ for $cat in $app:conf?catalogs?* where $cat?main_cat return <li><b>{$cat?cat_name}</b>&#160;{parse-xml("<span>"||$cat?description||"</span>")}</li>}</ul></li>
                 {if ( false() = $app:conf?catalogs?*?main_cat ) then <li>Additionnal catalogs (use toggle button in the menu to get result tables)<ul>{ for $cat in $app:conf?catalogs?* where not($cat?main_cat) return <li><b>{$cat?cat_name}</b>&#160;{parse-xml("<span>"||$cat?description||"</span>")}</li>}</ul></li> else ()}
             </ul>
-            Each query is performed within {$max?dist_as_info}&apos;&apos; of the Science Target.
+            Each query is performed within {$max?dist_as_info}&apos;&apos; of the Science Target below the max declinaison of {$max?declinaison_info}°.
             A magnitude filter is applied on every Fringe Tracker Targets according to the best limits offered in P110
             for <b>UT (MACAO) OR AT (NAOMI)</b>  respectively <b>( K &lt; {$max?magK_UT_info} AND V &lt; {$max?magV_info} ) OR ( K &lt; {$max?magK_AT_info} AND R&lt;{$max?magR_info} )</b>.
             When missing, the V and R magnitudes are computed from the Gaia G, Grb and Grp magnitudes.
@@ -365,7 +372,7 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
             </ul></div>
 
     let $merged-table :=
-        <table class="table table-light datatable">
+        <table class="table  table-bordered table-light table-hover datatable">
             <thead><th>Science</th>{($lis//thead)[1]//th}</thead>
             {
                 for $table in $lis//table
@@ -409,7 +416,7 @@ declare function app:search($id, $max, $s, $cat) {
         let $tr-count := count($votable//*:TABLEDATA/*)
         return
         <div class="table-responsive">
-            <table class="table table-light datatable" data-found-targets="{$tr-count}" data-src-targets="{$cat?cat_name}" data-science="{$s/name}">
+            <table class="table table-bordered table-light table-hover datatable" data-found-targets="{$tr-count}" data-src-targets="{$cat?cat_name}" data-science="{$s/name}">
                 <thead><tr>
                     {for $f at $cpos in $votable//*:FIELD return
                         if ($cpos != $source_id_idx) then
@@ -484,17 +491,14 @@ declare function app:get-identifiers-from-file($indentifiersFile as xs:string*){
 declare %templates:wrap function app:bulk-form($node as node(), $model as map(*), $identifiers as xs:string*, $format as xs:string*, $catalogs as xs:string*, $indentifiersFile as xs:string*) {
     let $defaults := app:defaults()
     let $max := $defaults("max")
-    let $max-mags := map:merge( map:for-each( $max, function($k,$v){ if ( starts-with($k,"mag") and not(ends-with($k,"info")) ) then map:entry($k,$v) else () } ) )
     (: was here before max-mags to convey mags parameters
         let $params :=  for $p in request:get-parameter-names() where not ( $p=("identifiers", "catalogs") ) return <input type="hidden" name="{$p}" value="{request:get-parameter($p,' ')}"/> :)
 
-    let $max-inputs :=  map:for-each( $max-mags, function ($k, $v) {
-            <div class="p-2"><div class="input-group">
-                 <span class="input-group-text">{$k}</span>
-                 <input name="max_{$k}" value="{$v}" class="form-control"/>
-
-            </div></div>
-            })
+    let $max-inputs :=  for $k in ("magV","magR","magK_UT","magK_AT", "declinaison") let $v := map:get($max,$k) return
+        <div class="p-2"><div class="input-group">
+                <span class="input-group-text">{$k}</span>
+                <input name="max_{$k}" value="{$v}" class="form-control"/>
+        </div></div>
     let $default-catalogs := for $cat in $app:conf?catalogs?* where exists($cat?bulk) order by $cat?main_cat descending return $cat?cat_name
     let $user-catalogs := request:get-parameter("catalogs", ())
     let $cats-params := for $catalog in $default-catalogs
@@ -527,7 +531,7 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
                 {$cats-params}
             </div>
 
-            <div class="d-flex p-2"><div class="p-2 justify-content-end">Limit magnitudes:</div>
+            <div class="d-flex p-2"><div class="p-2 justify-content-end">Max&#160;constraints:</div>
                 {$max-inputs}
             </div>
             <div class="d-flex p-2">
@@ -541,7 +545,7 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
         (
             app:searchftt-bulk-list($identifiers, $max, $user-catalogs),
             app:datatable-script(),
-            <p><i class="bi bi-info-circle-fill"></i> <kbd>Shift</kbd> click in the column order buttons to combine a multi column sorting.</p>
+            <p><i class="bi bi-info-circle-fill"></i>&#160;<kbd>Shift</kbd> click in the column order buttons to combine a multi column sorting.</p>
         )
     else ()
     )
@@ -556,11 +560,26 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
     let $trs := for $star in $map?* order by $star
         return <tr> {for $col in $cols return <td>{data($star/*[name(.)=$col])}</td> } </tr>
 
-    let $table := <table class="table table-light datatable">
+    let $table := <table class="table table-bordered table-light table-hover datatable">
         <thead>{$th}</thead>
         {$trs}
         </table>
     let $votable := jmmc-tap:table2votable($table, "targets")
+
+
+    let $res-tables :=  map:merge((
+        for $cat-name in $catalogs-to-query
+        let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
+        where exists($cat)
+        let $res  := app:bulk-search($votable, $max, $cat )
+        return map:entry($cat-name,$res)))
+
+    let $summary :=
+        for $cat-name in $catalogs-to-query
+            let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
+            where exists($cat)
+            let $table := $res-tables($cat-name)//table
+            return $cat-name || " " ||count($table//tr)
 
      let $csv := string-join(
         (
@@ -568,22 +587,22 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
             for $tr in $table/tr return string-join($tr/td,";")
         ),"&#10;"
         )
+
     let $targets :=<div><h3>Your { count($table//tr[td]) } targets
         <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="input.vot">votable</a>&#160;
         <a class="btn btn-outline-secondary btn-sm" href="data:text/csv;base64,{util:base64-encode(serialize($csv))}" type="text/csv" download="input.csv">csv</a>
-
         </h3>{$table}</div>
-
-    let $res-tables :=  for $cat-name in $catalogs-to-query
-        let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
-        where exists($cat)
-        return
-            app:bulk-search($votable, $max, $cat )
 
     return
         (<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>
-        , $res-tables
+        , $summary
         , $targets
+        ,<p>By now, the ut_flag and at_flag columns are not computed in the votable but the table below ( 1=FT, 2=AO, 3=FT or AO). Magnitudes columns colors are for
+            <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-success bg-opacity-10 border border-success border-opacity-10 rounded-2">UT and AT compliancy</small>,
+            <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-warning bg-opacity-10 border border-warning border-opacity-10 rounded-2">UT compliancy</small> or
+            <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-danger bg-opacity-10 border border-danger border-opacity-10 rounded-2">not compatible / unknown</small>
+        </p>
+        , $res-tables?*
         ,<code class="extdebug d-none"><br/>{serialize($votable)}</code>
         )
 };
@@ -646,7 +665,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             let $id2target := app:resolve-by-names($targets-ids)
 
             return
-            <table class="table table-light table-bordered datatable exttable">
+            <table class="table table-light table-bordered table-hover datatable exttable">
                 <thead><tr>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{data($field/@name)}</th>}</tr></thead>
                 {for $src_tr in subsequence($trs,1,$max?result_table_rows) group by $science := $src_tr/*:TD[$science_idx]
                     return for $tr in $src_tr
@@ -703,11 +722,6 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="searchftt_{$cat?cat_name}.vot">votable</a>&#160;
             <a class="btn btn-outline-secondary btn-sm" href="data:text/csv;base64,{util:base64-encode(serialize($csv))}" type="text/csv" download="searchftt_{$cat?cat_name}.csv">csv</a>
          </h3>
-        <p>By now, the ut_flag and at_flag columns are not computed in the votable but the table below ( 1=FT, 2=AO, 3=FT or AO). Magnitudes columns colors are for
-            <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-success bg-opacity-10 border border-success border-opacity-10 rounded-2">UT and AT compliancy</small>,
-            <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-warning bg-opacity-10 border border-warning border-opacity-10 rounded-2">UT compliancy</small> or
-            <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-danger bg-opacity-10 border border-danger border-opacity-10 rounded-2">not compatible / unknown</small>
-        </p>
         { $table }
         {$query-code}
         {<code class="extdebug d-none"><br/>Catalog query duration : {seconds-from-duration(util:system-time()-$start-time)}s</code>}
@@ -796,7 +810,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     (: cross match must be done in the catalog epoch to retrieve candidates without PM :)
     (: /!\ VizieR will never end the processing if we do not put the input position in the POINT :)
     let $positional-xmatch := <position>CONTAINS( POINT('ICRS', {$cat?ra}, {$cat?dec}), CIRCLE('ICRS', {$ra_in_cat}, {$dec_in_cat}, {$max?dist_as}/3600.0) ) = 1</position>
-
+    let $max_dec := <position>{$cat?dec} &lt; {$max?declinaison}</position>
     let $comments := string-join((""), "&#10;")
 
     (: TODO
@@ -819,8 +833,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     FROM
         {$upload-from} {$from}
     WHERE
-        {$positional-xmatch}
-        {string-join(("","  AND",$max-mag-filters)[$singlequery] ,"&#10;        ")}
+        {string-join(($positional-xmatch,($max-mag-filters, $max_dec)[$singlequery]) ,"&#10;            AND&#10;          ")}
     ORDER BY
         {$order-by} j2000_dist_as
     </text>
@@ -834,8 +847,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         JOIN {$froms[1]} USING (source_id)
         JOIN {$froms[2]}
     WHERE
-        {$max-mag-filters[not($singlequery)]}
-
+        { string-join( ($max-mag-filters, $max_dec) ,"&#10;            AND&#10;          ") }
     </text>
 
     return
