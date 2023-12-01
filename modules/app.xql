@@ -20,6 +20,12 @@ import module namespace jmmc-simbad="http://exist.jmmc.fr/jmmc-resources/simbad"
     - prefer lower_case colnames since some backend rewrite to lower case input colnames
     - we could refactor with a map that would store column names so we replace and avoid use of error prone strings searching for come columns
     - we could extend the default map (and rename it to config ? ) so we can store more than max values and associate for each of them more metadata : desc, displayorder...)
+
+   FUTURE IDEAS/TODOS :
+    - use cookies to store user defined values 
+    - move magnitude field names to standart notation
+    - do chunk of long votables before quering TAP
+    - accept file for long list of identifiers (and support coord+pm when simbad does not resolv it)
 :)
 
 
@@ -552,45 +558,61 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
 };
 
 declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map(*), $catalogs-to-query as xs:string* ) {
+    let $catalogs-to-query := for $cat-name in $catalogs-to-query
+        where exists($app:conf?catalogs?*[?cat_name=$cat-name])
+        return $cat-name
+
     let $ids := distinct-values($identifiers ! tokenize(., ";")!normalize-space(.))[string-length()>0]
-    let $map := app:resolve-by-names($ids)
+    let $identifiers-map := app:resolve-by-names($ids)
 
-    let $cols := $map?*[1]/* ! name(.)
+    (: Let's build a table on top of main info so we can use it for tap votable upload later :)
+    let $cols := $identifiers-map?*[1]/* ! name(.)
     let $th := <tr> {$cols ! <th>{.}</th>}</tr>
-    let $trs := for $star in $map?* order by $star
+    let $trs := for $star in $identifiers-map?* order by $star
         return <tr> {for $col in $cols return <td>{data($star/*[name(.)=$col])}</td> } </tr>
+    let $table := <table class="table table-bordered table-light table-hover datatable">
+        <thead>{$th}</thead>
+        {$trs}
+        </table>
+    let $votable := jmmc-tap:table2votable($table, "targets")
+    (: TODO iterate and merge over chunk of 
+    let $votables := jmmc-tap:table2votable($table, "targets", 500) :)
 
+
+    let $res-tables :=  map:merge((
+        for $cat-name in $catalogs-to-query
+        let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
+        let $res  := app:bulk-search($votable, $max, $cat )
+        return map:entry($cat-name,$res)))
+
+    (: Rebuild the table (and votable) with a summary of what we have in the catalogs :)
+
+    let $sci-cols :=  $identifiers-map?*[1]/* ! name(.)
+    let $cat-cols :=  $catalogs-to-query
+    let $cols := ($sci-cols,$cat-cols)
+    let $th := <tr> {$cols ! <th>{.}</th>}</tr>
+    let $trs := for $star in $identifiers-map?* order by $star
+        return <tr>
+            {for $col in $sci-cols return <td>{data($star/*[name(.)=$col])}</td> }
+            {   for $cat in $cat-cols return
+                <td>{$cat}</td>
+            }
+                </tr>
     let $table := <table class="table table-bordered table-light table-hover datatable">
         <thead>{$th}</thead>
         {$trs}
         </table>
     let $votable := jmmc-tap:table2votable($table, "targets")
 
-
-    let $res-tables :=  map:merge((
-        for $cat-name in $catalogs-to-query
-        let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
-        where exists($cat)
-        let $res  := app:bulk-search($votable, $max, $cat )
-        return map:entry($cat-name,$res)))
-
     let $summary :=
         for $cat-name in $catalogs-to-query
             let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
-            where exists($cat)
             let $table := $res-tables($cat-name)//table
             return $cat-name || " " ||count($table//tr)
 
-     let $csv := string-join(
-        (
-            string-join($table/thead[1]//th,";"),
-            for $tr in $table/tr return string-join($tr/td,";")
-        ),"&#10;"
-        )
 
     let $targets :=<div><h3>Your { count($table//tr[td]) } targets
         <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="input.vot">votable</a>&#160;
-        <a class="btn btn-outline-secondary btn-sm" href="data:text/csv;base64,{util:base64-encode(serialize($csv))}" type="text/csv" download="input.csv">csv</a>
         </h3>{$table}</div>
 
     return
@@ -635,6 +657,9 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             <a><error>{$err:description}</error>{$err:value}</a>
         }
 
+
+
+
     let $table := if($votable/error or $votable//*:INFO[@name="QUERY_STATUS" and @value="ERROR"])
          then
             <div class="alert alert-danger" role="alert">
@@ -665,9 +690,12 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             let $id2target := app:resolve-by-names($targets-ids)
 
             return
+            
             <table class="table table-light table-bordered table-hover datatable exttable">
-                <thead><tr>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{data($field/@name)}</th>}</tr></thead>
-                {for $src_tr in subsequence($trs,1,$max?result_table_rows) group by $science := $src_tr/*:TD[$science_idx]
+                <thead><tr>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{data($field/@name)}</th>}<th title="number of stars returned for the same science target">commons</th></tr></thead>
+                {
+                    for $src_tr in subsequence($trs,1,$max?result_table_rows) group by $science := $src_tr/*:TD[$science_idx]
+                    let $group_size := count($src_tr)
                     return for $tr in $src_tr
                     let $simbad_id := $cat?simbad_prefix_id||$tr/*[$source_id_idx]
                     let $simbad := map:get($id2target, $simbad_id)
@@ -703,6 +731,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
                                         $ut_flag
                                     default return data($td)
                             }</td>}
+                            <td>{$group_size}</td>
                         </tr>
                 }
             </table>
@@ -742,9 +771,11 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $order-by := if($votname) then "science," else ()
 
     (: We could have built query with COALESCE to replace missing pmra by 0, but:
-        GAVO does not support it inside a formulae and VizieR forbid it  :(
+        GAVO does not support it inside a formulae 
+        VizieR forbid it  :(
+        but ESA DC does with ESDC_COALESCE (add it in the catalog map ?)
 
-        TODO simplify distance computation if we do not have any pm info or same epoch ?
+        OR simplify distance computation if we do not have any pm info or same epoch ?
     :)
 
     let $distance_J2000 := <dist_as>DISTANCE(
