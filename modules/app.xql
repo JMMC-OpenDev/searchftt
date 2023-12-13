@@ -14,6 +14,8 @@ import module namespace config="http://exist.jmmc.fr/searchftt/apps/searchftt/co
 
 import module namespace jmmc-tap="http://exist.jmmc.fr/jmmc-resources/tap" at "/db/apps/jmmc-resources/content/jmmc-tap.xql";
 import module namespace jmmc-simbad="http://exist.jmmc.fr/jmmc-resources/simbad" at "/db/apps/jmmc-resources/content/jmmc-simbad.xql";
+import module namespace jmmc-ws="http://exist.jmmc.fr/jmmc-resources/ws" at "/db/apps/jmmc-resources/content/jmmc-ws.xql";
+
 (:import module namespace jmmc-astro="http://exist.jmmc.fr/jmmc-resources/astro" at "/db/apps/jmmc-resources/content/jmmc-astro.xql";:) (: WARNING this module require to enable eXistDB's Java Binding :)
 
 (: DEV HINTS:
@@ -22,8 +24,10 @@ import module namespace jmmc-simbad="http://exist.jmmc.fr/jmmc-resources/simbad"
     - we could extend the default map (and rename it to config ? ) so we can store more than max values and associate for each of them more metadata : desc, displayorder...)
 
    FUTURE IDEAS/TODOS :
-    - use cookies to store user defined values 
-    - move magnitude field names to standart notation
+    - show table overflow reaching max_result_table_rows !
+    - add units in table
+    - use cookies to store user defined values
+    - move magnitude field names to standart notation https://vizier.cds.unistra.fr/vizier/catstd/catstd.htx
     - do chunk of long votables before quering TAP
     - accept file for long list of identifiers (and support coord+pm when simbad does not resolv it)
 :)
@@ -576,11 +580,11 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
         {$trs}
         </table>
     let $votable := jmmc-tap:table2votable($table, "targets")
-    (: TODO iterate and merge over chunk of 
+    (: TODO iterate and merge over chunk of
     let $votables := jmmc-tap:table2votable($table, "targets", 500) :)
 
 
-    let $res-tables :=  map:merge((
+    let $bulk-search-maps :=  map:merge((
         for $cat-name in $catalogs-to-query
         let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
         let $res  := app:bulk-search($votable, $max, $cat )
@@ -591,12 +595,13 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
     let $sci-cols :=  $identifiers-map?*[1]/* ! name(.)
     let $cat-cols :=  $catalogs-to-query
     let $cols := ($sci-cols,$cat-cols)
-    let $th := <tr> {$cols ! <th>{.}</th>}</tr>
-    let $trs := for $star in $identifiers-map?* order by $star
+    let $th := <tr> {$sci-cols ! <th>{.}</th>} {$cat-cols ! <th title="# possible FT/AO combinations in the given catalogue">{.}</th>} </tr>
+    let $trs :=  for $identifier in map:keys($identifiers-map) order by $identifier
+        let $science := map:get($identifiers-map, $identifier)
         return <tr>
-            {for $col in $sci-cols return <td>{data($star/*[name(.)=$col])}</td> }
+            {for $col in $sci-cols return <td>{data($science/*[name(.)=$col])}</td> }
             {   for $cat in $cat-cols return
-                <td>{$cat}</td>
+                <td>{count($bulk-search-maps($cat)?ranking?sciences?($identifier))}</td>
             }
                 </tr>
     let $table := <table class="table table-bordered table-light table-hover datatable">
@@ -608,7 +613,7 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
     let $summary :=
         for $cat-name in $catalogs-to-query
             let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
-            let $table := $res-tables($cat-name)//table
+            let $table := $bulk-search-maps($cat-name)?html
             return $cat-name || " " ||count($table//tr)
 
 
@@ -620,12 +625,13 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
         (<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>
         , $summary
         , $targets
-        ,<p>By now, the ut_flag and at_flag columns are not computed in the votable but the table below ( 1=FT, 2=AO, 3=FT or AO). Magnitudes columns colors are for
+        ,<h2>Results per catalogs.</h2>
+        ,<p>By now, the ut_flag and at_flag columns are not computed in the votable but the table below ( 1=FT, 2=AO, 3=FT or AO). <br/> Magnitudes columns colors are for
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-success bg-opacity-10 border border-success border-opacity-10 rounded-2">UT and AT compliancy</small>,
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-warning bg-opacity-10 border border-warning border-opacity-10 rounded-2">UT compliancy</small> or
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-danger bg-opacity-10 border border-danger border-opacity-10 rounded-2">not compatible / unknown</small>
         </p>
-        , $res-tables?*
+        , $bulk-search-maps?*?html
         ,<code class="extdebug d-none"><br/>{serialize($votable)}</code>
         )
 };
@@ -656,10 +662,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
                             jmmc-tap:tap-adql-query($cat?tap_endpoint,$query[2], $input-votable2, $max-rec, $cat?tap_format, "step2")
         } catch * {
             <a><error>{$err:description}</error>{$err:value}</a>
-        }
-
-
-
+        }    
 
     let $table := if($votable/error or $votable//*:INFO[@name="QUERY_STATUS" and @value="ERROR"])
          then
@@ -676,6 +679,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
                 {util:log("error", data($votable))}
             </div>
         else
+
             let $field_names := for $e in $votable//*:FIELD/@name return lower-case($e)
             let $science_idx := index-of($field_names, "science")
             let $source_id_idx := index-of($field_names, "source_id")
@@ -691,7 +695,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             let $id2target := app:resolve-by-names($targets-ids)
 
             return
-            
+
             <table class="table table-light table-bordered table-hover datatable exttable">
                 <thead><tr>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{data($field/@name)}</th>}<th title="number of stars returned for the same science target">commons</th></tr></thead>
                 {
@@ -736,26 +740,59 @@ declare function app:bulk-search($input-votable, $max, $cat) {
                         </tr>
                 }
             </table>
-
     let $log := util:log("info", "done ("||seconds-from-duration(util:system-time()-$start-time)||"s)")
     let $nb_rows := count($votable//*:TR)
-    let $csv := string-join(
-        (
-            string-join($table/thead[1]//th,";"),
-            for $tr in $table/tr return string-join($tr/td,";")
-        ),"&#10;"
-        )
-    return
+    return map { "html":
         <div class="{if($cat?main_cat) then () else "extcats d-none"}">
         <h3>
             {$cat?cat_name} ({$nb_rows})&#160;
-            <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="searchftt_{$cat?cat_name}.vot">votable</a>&#160;
-            <a class="btn btn-outline-secondary btn-sm" href="data:text/csv;base64,{util:base64-encode(serialize($csv))}" type="text/csv" download="searchftt_{$cat?cat_name}.csv">csv</a>
+            <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="searchftt_{$cat?cat_name}.vot">votable</a>
          </h3>
-        { $table }
+        { $table }        
         {$query-code}
         {<code class="extdebug d-none"><br/>Catalog query duration : {seconds-from-duration(util:system-time()-$start-time)}s</code>}
-        </div>
+        </div>,
+        "ranking": app:get-ranking($votable)
+    }    
+};
+
+(: Returns a ranking map or empty value if given votable has no data 
+
+:)
+declare function app:get-ranking($votable) {
+    if(empty($votable//*:TR)) then () else 
+        (: prepare input with every permutations :)
+        let $internal-match-query := app:build_internal_query($votable, "internal")
+        let $res := jmmc-tap:tap-adql-query("http://tap.jmmc.fr/vollt/tap/sync", $internal-match-query, $votable, -1, "votable/td", "internal")
+        let $log := util:log("info", "internal match field count = "|| count($res//*:FIELD) || " rows count = "|| count($res//*:TR) )
+
+        let $array := array{
+                for $tr at $pos in $res//*:TR
+                    return $pos
+            }
+
+        let $map-by-sci  := map:merge((
+            for $tr at $pos in $res//*:TR group by $science := data($tr/*:TD[1])
+                return map:entry($science,$pos)
+        ))
+        return
+            map{ "sciences" : $map-by-sci , "scores": $array}
+};
+
+declare function app:build_internal_query($votable, $table-name){
+    (: iterate on every columns except science and add a new distance :)
+    let $colnames := for $f in $votable//*:FIELD/@name return lower-case($f)
+    let $internal-match := string-join((
+        "SELECT",
+        string-join(
+            ("ft.science as science",
+            "DISTANCE( POINT( 'ICRS', ft.ra, ft.dec),POINT('ICRS', ao.ra, ao.dec))*3600.0 as sep_ft_ao",
+            for $c in $colnames[not(.="science")] return for $type in ("ft", "ao") return  string-join( ($type, ".", $c, " as ", $c, "_", $type) )
+            ),", "),
+        " FROM TAP_UPLOAD."||$table-name||" as ft , TAP_UPLOAD."||$table-name||" as ao "
+        ),"&#10;")
+    return
+        $internal-match
 };
 
 declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
@@ -772,7 +809,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $order-by := if($votname) then "science," else ()
 
     (: We could have built query with COALESCE to replace missing pmra by 0, but:
-        GAVO does not support it inside a formulae 
+        GAVO does not support it inside a formulae
         VizieR forbid it  :(
         but ESA DC does with ESDC_COALESCE (add it in the catalog map ?)
 
