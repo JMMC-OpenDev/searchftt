@@ -601,7 +601,7 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
         return <tr>
             {for $col in $sci-cols return <td>{data($science/*[name(.)=$col])}</td> }
             {   for $cat in $cat-cols return
-                <td>{count($bulk-search-maps($cat)?ranking?sciences?($identifier))}</td>
+                <td>{count( $bulk-search-maps($cat)?ranking?sciences?($identifier) ) } : { for $i at $pos in $bulk-search-maps($cat)?ranking?ftaos?*  return <span>&#160;<b>{$pos}</b> : {string-join($i,",")}</span>}</td>
             }
                 </tr>
     let $table := <table class="table table-bordered table-light table-hover datatable">
@@ -765,18 +765,27 @@ declare function app:get-ranking($votable) {
         let $internal-match-query := app:build_internal_query($votable, "internal")
         let $res := jmmc-tap:tap-adql-query("http://tap.jmmc.fr/vollt/tap/sync", $internal-match-query, $votable, -1, "votable/td", "internal")
         let $log := util:log("info", "internal match field count = "|| count($res//*:FIELD) || " rows count = "|| count($res//*:TR) )
+        let $field-names := for $e in $res//*:FIELD/@name return lower-case($e)
+        (:let $log := util:log("info", string-join($field-names, ", "))
+        let $log := util:log("info", serialize($res)):)
 
         let $array := array{
                 for $tr at $pos in $res//*:TR
                     return $pos
             }
 
+        let $ftaos := array{
+                for $tr at $pos in $res//*:TR
+                    return array{ ( data($tr/*:TD[3]), data($tr/*:TD[4]) ) }
+            }
+
+
         let $map-by-sci  := map:merge((
             for $tr at $pos in $res//*:TR group by $science := data($tr/*:TD[1])
                 return map:entry($science,$pos)
         ))
         return
-            map{ "sciences" : $map-by-sci , "scores": $array}
+            map{ "sciences" : $map-by-sci , "ftaos": $ftaos ,"scores": $array}
 };
 
 declare function app:build_internal_query($votable, $table-name){
