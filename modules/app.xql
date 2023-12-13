@@ -218,7 +218,8 @@ declare function app:datatable-script(){
                 }}
             }},
             ],
-            "paging": true,"searching":true,"info": false,"order": [],
+            "paging": false,"scrollX": true,"scrollY": 600, "scrollResize": true,"scrollCollapse": true,
+            "searching":true,"info": false,"order": [],
             "dom": 'Bfrtip',
             "buttons": ['pageLength', 'colvis','csv','copy'  ],
             "lengthMenu": [
