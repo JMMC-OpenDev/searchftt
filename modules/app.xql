@@ -600,8 +600,21 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
         let $science := map:get($identifiers-map, $identifier)
         return <tr>
             {for $col in $sci-cols return <td>{data($science/*[name(.)=$col])}</td> }
-            {   for $cat in $cat-cols return
-                <td>{count( $bulk-search-maps($cat)?ranking?sciences?($identifier) ) } : { for $i at $pos in $bulk-search-maps($cat)?ranking?ftaos?*  return <span>&#160;<b>{$pos}</b> : {string-join($i,",")}</span>}</td>
+            {for $cat in $cat-cols 
+                let $ftaos := $bulk-search-maps($cat)?ranking?ftaos
+                let $scores := $bulk-search-maps($cat)?ranking?scores
+                return
+                <td>{
+                    let $science-idx := $bulk-search-maps($cat)?ranking?sciences-idx?($identifier)                    
+                    return 
+                    <span>
+                        { count( $science-idx ) } configurations :         
+                        <table class="table table-bordered table-light table-hover">
+                            <tr><th>FT</th><th>AO</th><th>SCORE</th></tr>
+                            { for $idx in $science-idx return <tr><td>{$ftaos?*[$idx]?*[1]}</td><td>{$ftaos?*[$idx]?*[2]}</td><td>{$scores?*[$idx]}</td></tr> }
+                        </table>
+                    </span>
+                }</td>
             }
                 </tr>
     let $table := <table class="table table-bordered table-light table-hover datatable">
@@ -756,9 +769,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
     }    
 };
 
-(: Returns a ranking map or empty value if given votable has no data 
-
-:)
+(: Returns a ranking map or empty value if given votable has no data :)
 declare function app:get-ranking($votable) {
     if(empty($votable//*:TR)) then () else 
         (: prepare input with every permutations :)
@@ -769,9 +780,9 @@ declare function app:get-ranking($votable) {
         (:let $log := util:log("info", string-join($field-names, ", "))
         let $log := util:log("info", serialize($res)):)
 
-        let $array := array{
+        let $scores := array{
                 for $tr at $pos in $res//*:TR
-                    return $pos
+                    return 1 div $pos (: dummy value to be replaced by ws results:)
             }
 
         let $ftaos := array{
@@ -785,7 +796,7 @@ declare function app:get-ranking($votable) {
                 return map:entry($science,$pos)
         ))
         return
-            map{ "sciences" : $map-by-sci , "ftaos": $ftaos ,"scores": $array}
+            map{ "sciences-idx" : $map-by-sci , "ftaos": $ftaos ,"scores": $scores}
 };
 
 declare function app:build_internal_query($votable, $table-name){
