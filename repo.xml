@@ -23,7 +23,6 @@
         <li>Provide buld tables export in votable or csv.</li>
         <li>Add a max_declinaison limit, default to 40° for VLTI case. User can override the value with max_declinaison parameter e.g: <a href="index.html?max_dist_as=40&amp;max_magK_UT=12&amp;max_magK_AT=11&amp;max_magV=16&amp;max_magR=13.5&amp;max_declinaison=90">full sky query</a></li>
         <li>Enable output table functions:<ul><li>search</li><li>add export to clipboard or CSV buttons</li><li>pagination</li><li>column selection</li></ul></li>
-        
       </ul>
     </change>
      <change version="1.4">
