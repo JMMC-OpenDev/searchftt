@@ -593,52 +593,57 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
         return map:entry($cat-name,$res)))
 
     (: Rebuild the table (and votable) with a summary of what we have in the catalogs :)
+	let $log := util:log("info", "prepare main merged table ... ")
 
     let $sci-cols :=  $identifiers-map?*[1]/* ! name(.)
-    let $cat-cols :=  $catalogs-to-query
-    let $cols := ($sci-cols,$cat-cols)
-    let $th := <tr> {$sci-cols ! <th>{.}</th>} {$cat-cols ! <th title="# possible FT/AO combinations in the given catalogue">{.}</th>} </tr>
+    let $ftaos-cols := ("FT identifier", "AO identifier", "Score", "Rank", "Catalog", "Input (sci_Kmag, ft_Kmag, sci_ft_dist, ao_Rmag, sci_ao_dist, ft_ao_dist)")
+    let $cols := ($sci-cols,$ftaos-cols)
+    let $th := <tr> {$cols ! <th>{.}</th>}</tr>
     let $trs :=  for $identifier in map:keys($identifiers-map) order by $identifier
         let $science := map:get($identifiers-map, $identifier)
-        return <tr>
-            {for $col in $sci-cols return <td>{data($science/*[name(.)=$col])}</td> }
-            {for $cat in $cat-cols 
+        return
+            for $cat in $catalogs-to-query
                 let $ftaos := $bulk-search-maps($cat)?ranking?ftaos
                 let $scores := $bulk-search-maps($cat)?ranking?scores
-                return
-                <td>{
-                    let $science-idx := $bulk-search-maps($cat)?ranking?sciences-idx?($identifier)                    
-                    return 
-                    <span>
-                        { count( $science-idx ) } configurations :         
+                let $science-idx := $bulk-search-maps($cat)?ranking?sciences-idx?($identifier)
+                let $inputs := $bulk-search-maps($cat)?ranking?inputs
+            (:
+                        { count( $science-idx ) } configurations :
                         <table class="table table-bordered table-light table-hover">
-                            <tr><th>FT</th><th>AO</th><th>SCORE</th></tr>
+                            <tr><th>FT</th><th>AO</th><th>SCORE</th></tr>9.03 16.381952728829486 4.91 16.883200012527162 31.668749771423702
                             { for $idx in $science-idx return <tr><td>{$ftaos?*[$idx]?*[1]}</td><td>{$ftaos?*[$idx]?*[2]}</td><td>{$scores?*[$idx]}</td></tr> }
                         </table>
-                    </span>
-                }</td>
-            }
-                </tr>
+                :)
+                let $ordered-science-idx := for $idx in $science-idx order by $scores?*[$idx] descending return $idx
+            return
+                for $idx at $pos in $ordered-science-idx
+                    where $pos <= 20
+                    let $ftao := $ftaos?*[$idx]?*
+                    return
+                        <tr>
+                            {for $col in $sci-cols return <td>{data($science/*[name(.)=$col])}</td> }
+                            <td>{$ftao[1]}</td>
+                            <td>{$ftao[2]}</td>
+                            <td>{$scores?*[$idx]}</td>
+                            <td>{$pos}</td>
+                            <td>{$cat}</td>
+                            <td>{string-join($inputs?*[$idx], ', ')}</td>
+                        </tr>
+
     let $table := <table class="table table-bordered table-light table-hover datatable">
         <thead>{$th}</thead>
         {$trs}
         </table>
     let $votable := jmmc-tap:table2votable($table, "targets")
 
-    let $summary :=
-        for $cat-name in $catalogs-to-query
-            let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
-            let $table := $bulk-search-maps($cat-name)?html
-            return $cat-name || " " ||count($table//tr)
+    let $log := util:log("info", "DONE : main table merged")
 
-
-    let $targets :=<div><h3>Your { count($table//tr[td]) } targets
+    let $targets :=<div><h3>{ count($table//tr[td]) }/{ count($bulk-search-maps?*?ranking?scores?*) } best proposed configurations for your {count(map:keys($identifiers-map))} targets (top 20)
         <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="input.vot">votable</a>&#160;
         </h3>{$table}</div>
 
     return
         (<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>
-        , $summary
         , $targets
         ,<h2>Results per catalogs.</h2>
         ,<p>By now, the ut_flag and at_flag columns are not computed in the votable but the table below ( 1=FT, 2=AO, 3=FT or AO). <br/> Magnitudes columns colors are for
@@ -647,7 +652,6 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-danger bg-opacity-10 border border-danger border-opacity-10 rounded-2">not compatible / unknown</small>
         </p>
         , $bulk-search-maps?*?html
-        ,<code class="extdebug d-none"><br/>{serialize($votable)}</code>
         )
 };
 
@@ -677,7 +681,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
                             jmmc-tap:tap-adql-query($cat?tap_endpoint,$query[2], $input-votable2, $max-rec, $cat?tap_format, "step2")
         } catch * {
             <a><error>{$err:description}</error>{$err:value}</a>
-        }    
+        }
 
     let $table := if($votable/error or $votable//*:INFO[@name="QUERY_STATUS" and @value="ERROR"])
          then
@@ -763,17 +767,17 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             {$cat?cat_name} ({$nb_rows})&#160;
             <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="searchftt_{$cat?cat_name}.vot">votable</a>
          </h3>
-        { $table }        
+        { $table }
         {$query-code}
         {<code class="extdebug d-none"><br/>Catalog query duration : {seconds-from-duration(util:system-time()-$start-time)}s</code>}
         </div>,
         "ranking": app:get-ranking($votable,$cat,$max)
-    }    
+    }
 };
 
 (: Returns a ranking map or empty value if given votable has no data :)
 declare function app:get-ranking($votable, $cat, $max) {
-    if(empty($votable//*:TR)) then () else 
+    if(empty($votable//*:TR)) then () else
         (: prepare input with every permutations :)
         let $internal-match-query := app:build_internal_query($votable, "internal", $cat, $max)
         let $res := jmmc-tap:tap-adql-query("http://tap.jmmc.fr/vollt/tap/sync", $internal-match-query, $votable, -1, "votable/td", "internal")
@@ -784,13 +788,13 @@ declare function app:get-ranking($votable, $cat, $max) {
 
         (: WebService ask for : [[sci_Kmag, ft_Kmag, sci_ft_dist, ao_Rmag, sci_ao_dist, ft_ao_dist]] :)
         (: at_flag_ao at_flag_ft cat_dist_as_ao cat_dist_as_ft dec_ao dec_ft epoch_ao epoch_ft j2000_dist_as_ao j2000_dist_as_ft j2024_dist_as_ao j2024_dist_as_ft
-           mag_g_ao mag_g_ft mag_ks_ao mag_ks_ft mag_r_ao mag_r_ft 
+           mag_g_ao mag_g_ft mag_ks_ao mag_ks_ft mag_r_ao mag_r_ft
            mag_v_ao mag_v_ft otype_txt_ao otype_txt_ft pmdec_ao pmdec_ft pmra_ao pmra_ft ra_ao ra_ft science sep_ft_ao source_id_ao source_id_ft ut_flag_ao ut_flag_ft
         :)
-        let $input := array{
+        let $inputs := array{
                  for $tr at $pos in $res//*:TR
-                    return array{ 
-                        ( 
+                    return array{
+                        (
                         0
                         , number($tr/*:TD[$colidx?mag_ks_ft])
                         , number($tr/*:TD[$colidx?cat_dist_as_ft])
@@ -798,11 +802,11 @@ declare function app:get-ranking($votable, $cat, $max) {
                         , number($tr/*:TD[$colidx?cat_dist_as_ao])
                         , number($tr/*:TD[$colidx?sep_ft_ao])
                         )
-                    }                                         
-            }        
-                
-        let $scores := jmmc-ws:pyws-ut_ngs_score($input)           
-        
+                    }
+            }
+
+        let $scores := jmmc-ws:pyws-ut_ngs_score($inputs)
+
         let $log := util:log("info", "scores length : "|| count($scores?*))
 
         let $ftaos := array{ for $tr at $pos in $res//*:TR
@@ -815,7 +819,7 @@ declare function app:get-ranking($votable, $cat, $max) {
                 return map:entry($science,$pos)
         ))
         return
-            map{ "sciences-idx" : $map-by-sci , "ftaos": $ftaos ,"scores": $scores}
+            map{ "sciences-idx" : $map-by-sci , "ftaos": $ftaos ,"scores": $scores, "inputs":$inputs}
 };
 
 declare function app:build_internal_query($votable, $table-name, $cat, $max){
@@ -828,22 +832,21 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
     let $computed_prefix := if($vmag and $rmag ) then () else "computed_"
     let $ft-filters := <text>(ft.mag_ks &lt; {max((number($max?magK_UT), number($max?magK_AT)))})</text>
     let $ao-filters := <text>(ao.{$computed_prefix}mag_r&lt;{$max?magR})</text>
-        
-    (: {$computed_prefix}mag_v
-     
-    :)
+
+    let $ftao-dist := <text>DISTANCE( POINT( 'ICRS', ft.ra, ft.dec),POINT('ICRS', ao.ra, ao.dec))*3600.0</text>
+    let $dist-filter := <text>({$ftao-dist} &lt; 60)</text>
 
     let $internal-match := string-join((
         "SELECT",
         string-join(
             ("ft.science as science",
-            "DISTANCE( POINT( 'ICRS', ft.ra, ft.dec),POINT('ICRS', ao.ra, ao.dec))*3600.0 as sep_ft_ao",
+            $ftao-dist || " as sep_ft_ao",
             for $c in $colnames[not(.="science")] return for $type in ("ft", "ao") return  string-join( ($type, ".", $c, " as ", $c, "_"[exists($c)], $type) )
             ),", "),
-        " FROM TAP_UPLOAD."||$table-name||" as ft , TAP_UPLOAD."||$table-name||" as ao ",        
-        " WHERE " || $ft-filters || " AND " || $ao-filters
+        " FROM TAP_UPLOAD."||$table-name||" as ft , TAP_UPLOAD."||$table-name||" as ao ",
+        " WHERE " || $ft-filters || " AND " || $ao-filters || " AND " || $dist-filters
         ),"&#10;")
-    
+
     let $log := util:log("info", "query : " || $internal-match)
 
     return
