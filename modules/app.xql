@@ -24,6 +24,8 @@ import module namespace jmmc-ws="http://exist.jmmc.fr/jmmc-resources/ws" at "/db
     - we could extend the default map (and rename it to config ? ) so we can store more than max values and associate for each of them more metadata : desc, displayorder...)
 
    FUTURE IDEAS/TODOS :
+    - present ft/ao tuples in the science table with a wait to keep only the best one so we can transmit them to Aspro2
+    - add a constraint on tmass_dist so we avoid wrong GAIA Xmatches
     - show table overflow reaching max_result_table_rows !
     - add units in table
     - use cookies to store user defined values
@@ -765,30 +767,47 @@ declare function app:bulk-search($input-votable, $max, $cat) {
         {$query-code}
         {<code class="extdebug d-none"><br/>Catalog query duration : {seconds-from-duration(util:system-time()-$start-time)}s</code>}
         </div>,
-        "ranking": app:get-ranking($votable)
+        "ranking": app:get-ranking($votable,$cat,$max)
     }    
 };
 
 (: Returns a ranking map or empty value if given votable has no data :)
-declare function app:get-ranking($votable) {
+declare function app:get-ranking($votable, $cat, $max) {
     if(empty($votable//*:TR)) then () else 
         (: prepare input with every permutations :)
-        let $internal-match-query := app:build_internal_query($votable, "internal")
+        let $internal-match-query := app:build_internal_query($votable, "internal", $cat, $max)
         let $res := jmmc-tap:tap-adql-query("http://tap.jmmc.fr/vollt/tap/sync", $internal-match-query, $votable, -1, "votable/td", "internal")
         let $log := util:log("info", "internal match field count = "|| count($res//*:FIELD) || " rows count = "|| count($res//*:TR) )
-        let $field-names := for $e in $res//*:FIELD/@name return lower-case($e)
-        (:let $log := util:log("info", string-join($field-names, ", "))
-        let $log := util:log("info", serialize($res)):)
+        let $colidx := map:merge( for $e at $pos in $res//*:FIELD/@name return map:entry(replace(lower-case($e),"computed_",""), $pos) )
+        let $log := util:log("info", serialize( map:keys($colidx) => sort() ))
+        (: let $log := util:log("info", serialize($res)) :)
 
-        let $scores := array{
-                for $tr at $pos in $res//*:TR
-                    return 1 div $pos (: dummy value to be replaced by ws results:)
-            }
+        (: WebService ask for : [[sci_Kmag, ft_Kmag, sci_ft_dist, ao_Rmag, sci_ao_dist, ft_ao_dist]] :)
+        (: at_flag_ao at_flag_ft cat_dist_as_ao cat_dist_as_ft dec_ao dec_ft epoch_ao epoch_ft j2000_dist_as_ao j2000_dist_as_ft j2024_dist_as_ao j2024_dist_as_ft
+           mag_g_ao mag_g_ft mag_ks_ao mag_ks_ft mag_r_ao mag_r_ft 
+           mag_v_ao mag_v_ft otype_txt_ao otype_txt_ft pmdec_ao pmdec_ft pmra_ao pmra_ft ra_ao ra_ft science sep_ft_ao source_id_ao source_id_ft ut_flag_ao ut_flag_ft
+        :)
+        let $input := array{
+                 for $tr at $pos in $res//*:TR
+                    return array{ 
+                        ( 
+                        0
+                        , number($tr/*:TD[$colidx?mag_ks_ft])
+                        , number($tr/*:TD[$colidx?cat_dist_as_ft])
+                        , number($tr/*:TD[$colidx?mag_r_ao])
+                        , number($tr/*:TD[$colidx?cat_dist_as_ao])
+                        , number($tr/*:TD[$colidx?sep_ft_ao])
+                        )
+                    }                                         
+            }        
+                
+        let $scores := jmmc-ws:pyws-ut_ngs_score($input)           
+        
+        let $log := util:log("info", "scores length : "|| count($scores?*))
 
-        let $ftaos := array{
-                for $tr at $pos in $res//*:TR
-                    return array{ ( data($tr/*:TD[3]), data($tr/*:TD[4]) ) }
-            }
+        let $ftaos := array{ for $tr at $pos in $res//*:TR
+                    return array{ data($tr/*:TD[$colidx?source_id_ft]), data($tr/*:TD[$colidx?source_id_ao]) }
+                    }
 
 
         let $map-by-sci  := map:merge((
@@ -799,18 +818,34 @@ declare function app:get-ranking($votable) {
             map{ "sciences-idx" : $map-by-sci , "ftaos": $ftaos ,"scores": $scores}
 };
 
-declare function app:build_internal_query($votable, $table-name){
+declare function app:build_internal_query($votable, $table-name, $cat, $max){
     (: iterate on every columns except science and add a new distance :)
     let $colnames := for $f in $votable//*:FIELD/@name return lower-case($f)
+    let $log := util:log("info", "colnames : " || string-join($colnames, " , "))
+
+    let $vmag := $cat?mag_v
+    let $rmag := $cat?mag_r
+    let $computed_prefix := if($vmag and $rmag ) then () else "computed_"
+    let $ft-filters := <text>(ft.mag_ks &lt; {max((number($max?magK_UT), number($max?magK_AT)))})</text>
+    let $ao-filters := <text>(ao.{$computed_prefix}mag_r&lt;{$max?magR})</text>
+        
+    (: {$computed_prefix}mag_v
+     
+    :)
+
     let $internal-match := string-join((
         "SELECT",
         string-join(
             ("ft.science as science",
             "DISTANCE( POINT( 'ICRS', ft.ra, ft.dec),POINT('ICRS', ao.ra, ao.dec))*3600.0 as sep_ft_ao",
-            for $c in $colnames[not(.="science")] return for $type in ("ft", "ao") return  string-join( ($type, ".", $c, " as ", $c, "_", $type) )
+            for $c in $colnames[not(.="science")] return for $type in ("ft", "ao") return  string-join( ($type, ".", $c, " as ", $c, "_"[exists($c)], $type) )
             ),", "),
-        " FROM TAP_UPLOAD."||$table-name||" as ft , TAP_UPLOAD."||$table-name||" as ao "
+        " FROM TAP_UPLOAD."||$table-name||" as ft , TAP_UPLOAD."||$table-name||" as ao ",        
+        " WHERE " || $ft-filters || " AND " || $ao-filters
         ),"&#10;")
+    
+    let $log := util:log("info", "query : " || $internal-match)
+
     return
         $internal-match
 };
