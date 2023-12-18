@@ -844,7 +844,7 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
             for $c in $colnames[not(.="science")] return for $type in ("ft", "ao") return  string-join( ($type, ".", $c, " as ", $c, "_"[exists($c)], $type) )
             ),", "),
         " FROM TAP_UPLOAD."||$table-name||" as ft , TAP_UPLOAD."||$table-name||" as ao ",
-        " WHERE " || $ft-filters || " AND " || $ao-filters || " AND " || $dist-filters
+        " WHERE " || $ft-filters || " AND " || $ao-filters || " AND " || $dist-filter
         ),"&#10;")
 
     let $log := util:log("info", "query : " || $internal-match)
