@@ -46,7 +46,8 @@ declare variable $app:json-conf :='{
         "max_dist_as" : 30,
         "max_declinaison" : 40,
         "max_rec" : 25,
-        "max_result_table_rows" : 1000
+        "max_result_table_rows" : 1000,
+        "prefered_catalog" : "esagaia3"
     },
     "extended-cols" : [ "pmra", "pmdec", "pmde", "epoch", "cat_dist_as", "today_dist_as"],
     "samestar-dist_deg" : 2.78E-4,
@@ -98,7 +99,6 @@ declare variable $app:json-conf :='{
             "detail"  : { },
             "from"    : "gaia.dr2light JOIN gdr2ap.main ON gaia.dr2light.source_id=gdr2ap.main.source_id"
         },"esagaia3": {
-            "enable" : true,
             "cat_name"     : "Gaia DR3",
             "main_cat"     : true,
             "bulk"         : true,
@@ -175,20 +175,35 @@ declare variable $app:conf := parse-json($app:json-conf);
 (:~
  : Build a map with default value comming from given config or overidden by user params.
  : Caller will use it as $max?keyname to retrieve $conf?max_keyname or max_keyname parameter
- : map will be populated by  keyname_info entries so we can display overriden param.
+ : User params are converted to the default value types if possible or not applied else.
+ : map will be populated by keyname_info entries so we can display overriden param.
  : @return a map with default or overriden values to use in the application.
 :)
 declare function app:defaults() as map(*){
-    map:entry("max", map:merge(
-        for $key in map:keys($app:conf?default) where starts-with($key, "max")
-            let $map-max-key:=replace($key, "max_", "")
-            let $map-info-key:=$map-max-key||"_info"
-            let $param := try{ xs:double( request:get-parameter($key, "") ) }catch * { () }
-            let $conf := xs:double($app:conf?default($key))
-            let $mapinfo:= if( exists($param) and ( $param != $conf)) then <mark title="overridden by user : default conf is {$conf}">{$param}</mark> else $conf
-            let $mapvalue:= if( exists($param) ) then $param else $conf
-            return ( map:entry($map-max-key, $mapvalue), map:entry($map-info-key, $mapinfo))
-    ))
+    let $sections := ("max", "prefered")
+    return
+    map:merge(
+        for $section in $sections
+            let $section-prefix := $section||"_"
+            return
+            map:entry($section, map:merge(
+                for $key in map:keys($app:conf?default) where starts-with($key, $section-prefix)
+                    let $map-key:=replace($key, $section-prefix, "")
+                    let $map-info-key:=$map-key||"_info"
+                    let $conf := $app:conf?default($key)
+                    let $param := (request:get-parameter($key, ""))[1] (: accept one param from uri or post payload :)
+                    let $map-info:= if( exists($param) and ( string($param) != string($conf) )) then <mark title="overridden by user : default conf is {$conf}">{$param}</mark> else $conf
+                    let $map-value:= if( exists($param) ) then
+                            try{
+                                typeswitch($conf)
+                                    case xs:double return xs:double($param)
+                                    case xs:integer return xs:integer($param)
+                                    default return $param
+                            } catch * {$conf}
+                        else $conf
+                    return ( map:entry($map-key, $map-value), map:entry($map-info-key, $map-info))
+            ))
+    )
 };
 
 declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*), $identifiers as xs:string*) {
