@@ -636,11 +636,31 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
         </table>
     let $votable := jmmc-tap:table2votable($table, "targets")
 
+    let $error-report := for $cat in $catalogs-to-query
+        let $info := $bulk-search-maps($cat)?ranking
+        let $error := $info?error
+        where exists($error)
+        return
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            {$error}<br/> query was for {$info?cat}: <br/>{$info?query}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+
+    let $error-report := for $ranking in $bulk-search-maps?*?ranking
+        let $error := $ranking?error
+        where exists($error)
+        return
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            {$error}<br/> query was for {$ranking?cat}: <br/>{$ranking?query}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+
+
     let $log := util:log("info", "DONE : main table merged")
 
     let $targets :=<div><h3>{ count($table//tr[td]) }/{ count($bulk-search-maps?*?ranking?scores?*) } best proposed configurations for your {count(map:keys($identifiers-map))} targets (top 20)
         <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="input.vot">votable</a>&#160;
-        </h3>{$table}</div>
+        </h3>
+        {$error-report}
+        {$table}</div>
 
     return
         (<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>
@@ -784,6 +804,8 @@ declare function app:get-ranking($votable, $cat, $max) {
         let $log := util:log("info", "internal match field count = "|| count($res//*:FIELD) || " rows count = "|| count($res//*:TR) )
         let $colidx := map:merge( for $e at $pos in $res//*:FIELD/@name return map:entry(replace(lower-case($e),"computed_",""), $pos) )
         let $log := util:log("info", serialize( map:keys($colidx) => sort() ))
+
+        let $error :=  data($res//*:INFO[@name='QUERY_STATUS' and @value='ERROR'])
         (: let $log := util:log("info", serialize($res)) :)
 
         (: WebService ask for : [[sci_Kmag, ft_Kmag, sci_ft_dist, ao_Rmag, sci_ao_dist, ft_ao_dist]] :)
@@ -805,21 +827,20 @@ declare function app:get-ranking($votable, $cat, $max) {
                     }
             }
 
-        let $scores := jmmc-ws:pyws-ut_ngs_score($inputs)
+        let $scores := if(exists($res//*:TR)) then jmmc-ws:pyws-ut_ngs_score($inputs) else ()
 
         let $log := util:log("info", "scores length : "|| count($scores?*))
 
         let $ftaos := array{ for $tr at $pos in $res//*:TR
-                    return array{ data($tr/*:TD[$colidx?source_id_ft]), data($tr/*:TD[$colidx?source_id_ao]) }
-                    }
-
+              return array{ data($tr/*:TD[$colidx?source_id_ft]), data($tr/*:TD[$colidx?source_id_ao]) }
+            }
 
         let $map-by-sci  := map:merge((
             for $tr at $pos in $res//*:TR group by $science := data($tr/*:TD[1])
                 return map:entry($science,$pos)
         ))
         return
-            map{ "sciences-idx" : $map-by-sci , "ftaos": $ftaos ,"scores": $scores, "inputs":$inputs}
+            map{"cat":$cat?cat_name, "error":$error, "query": $internal-match-query, "sciences-idx" : $map-by-sci , "ftaos": $ftaos ,"scores": $scores, "inputs":$inputs}
 };
 
 declare function app:build_internal_query($votable, $table-name, $cat, $max){
@@ -841,7 +862,11 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
         string-join(
             ("ft.science as science",
             $ftao-dist || " as sep_ft_ao",
-            for $c in $colnames[not(.="science")] return for $type in ("ft", "ao") return  string-join( ($type, ".", $c, " as ", $c, "_"[exists($c)], $type) )
+            for $c in $colnames[not(.="science")] return
+                for $type in ("ft", "ao")
+                    let $tc := if (contains($c, "source_id") and $cat?simbad_prefix_id) then <t>'{$cat?simbad_prefix_id}' || {$type}.{$c}</t> else string-join(($type, ".", $c))
+                    return
+                        string-join( ($tc, " as ", $c, "_"[exists($c)], $type) )
             ),", "),
         " FROM TAP_UPLOAD."||$table-name||" as ft , TAP_UPLOAD."||$table-name||" as ao ",
         " WHERE " || $ft-filters || " AND " || $ao-filters || " AND " || $dist-filter
