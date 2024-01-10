@@ -34,7 +34,8 @@ import module namespace jmmc-ws="http://exist.jmmc.fr/jmmc-resources/ws" at "/db
     - accept file for long list of identifiers (and support coord+pm when simbad does not resolv it)
 :)
 
-
+(: suffix used in maps to provide a text or html documentation :)
+declare variable $app:doc-suffix := "_doc";
 
 (: Main config to unify catalog accross their colnames or simbad :)
 declare variable $app:json-conf :='{
@@ -43,6 +44,11 @@ declare variable $app:json-conf :='{
         "max_magK_UT" : 11,
         "max_magK_AT" : 10,
         "max_magR" : 12.5,
+
+        "max_AO_mag": 12,
+        "max_AO_mag_doc": "use Gmag if present in catalogs else Rmag or Vmag",
+        "max_Kmag": 12,
+
         "max_dist_as" : 30,
         "max_declinaison" : 40,
         "max_rec" : 25,
@@ -179,7 +185,7 @@ declare variable $app:conf := parse-json($app:json-conf);
  : map will be populated by keyname_info entries so we can display overriden param.
  : @return a map with default or overriden values to use in the application.
 :)
-declare function app:defaults() as map(*){
+declare function app:config() as map(*){
     let $sections := ("max", "preferred")
     return
     map:merge(
@@ -201,6 +207,7 @@ declare function app:defaults() as map(*){
                                     default return $param
                             } catch * {$conf}
                         else $conf
+                    (: let $log := util:log("info", "conf ["|| $section ||"."|| $map-key || "]=" || $map-value) :)
                     return ( map:entry($map-key, $map-value), map:entry($map-info-key, $map-info))
             ))
     )
@@ -255,7 +262,7 @@ declare function app:datatable-script(){
 
 
 declare %templates:wrap function app:form($node as node(), $model as map(*), $identifiers as xs:string*, $format as xs:string*) {
-    let $max := app:defaults()("max")
+    let $max := app:config()("max")
     let $params :=  for $p in request:get-parameter-names()[.!="identifiers"] return <input type="hidden" name="{$p}" value="{request:get-parameter($p,' ')}"/>
     return
     (
@@ -517,19 +524,25 @@ declare function app:get-identifiers-from-file($indentifiersFile as xs:string*){
 };
 
 declare %templates:wrap function app:bulk-form($node as node(), $model as map(*), $identifiers as xs:string*, $format as xs:string*, $catalogs as xs:string*, $indentifiersFile as xs:string*) {
-    let $defaults := app:defaults()
-    let $max := $defaults("max")
+    let $config := app:config()
+    let $max := $config("max")
     (: was here before max-mags to convey mags parameters
         let $params :=  for $p in request:get-parameter-names() where not ( $p=("identifiers", "catalogs") ) return <input type="hidden" name="{$p}" value="{request:get-parameter($p,' ')}"/> :)
 
-    let $max-inputs :=  for $k in ("magV","magR","magK_UT","magK_AT", "declinaison") let $v := map:get($max,$k) return
+    let $max-inputs :=  for $k in ("Kmag","AO_mag", "declinaison") let $v := map:get($max,$k) return
         <div class="p-2"><div class="input-group">
-                <span class="input-group-text">{$k}</span>
+                <span class="input-group-text">
+                {
+                    let $doc := map:get($max, $k||$app:doc-suffix)
+                    return
+                        if(exists($doc))then <a title="{$doc}">{$k}<i class="bi bi-question-circle"></i></a> else $k
+                }
+                </span>
                 <input name="max_{$k}" value="{$v}" class="form-control"/>
+
         </div></div>
     let $default-catalogs := for $cat in $app:conf?catalogs?* where exists($cat?bulk) order by $cat?main_cat descending return $cat?cat_name
-    let $catalogs := if(exists($catalogs)) then $catalogs else $defaults?preferred?bulk_catalog
-    let $log := util:log("info", "preferred catalog:" || string-join(map:keys($defaults?preferred), ", "))
+    let $catalogs := if(exists($catalogs)) then $catalogs else $config?preferred?bulk_catalog
     let $cats-params := for $catalog in $default-catalogs
         return
             <div class="p-2"><div class="input-group">
@@ -879,7 +892,7 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
             $ftao-dist || " as sep_ft_ao",
             for $c in $colnames[not(.="science")] return
                 for $type in ("ft", "ao")
-                    let $tc := if (contains($c, "source_id") and $cat?simbad_prefix_id) then <t>'{$cat?simbad_prefix_id}' || {$type}.{$c}</t> else string-join(($type, ".", $c))
+                    let $tc := if (contains($c, "source_id") and $cat?simbad_prefix_id) then <t> '{$cat?simbad_prefix_id}' || {$type}.{$c}</t> else string-join(($type, ".", $c))
                     return
                         string-join( ($tc, " as ", $c, "_"[exists($c)], $type) )
             ),", "),
@@ -893,6 +906,11 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
         $internal-match
 };
 
+(: A votable is given in bulk mode.
+    bulk query are not the same as the individual one.
+    limits are not the same bulk uses max.Kmag and max.AO_mag (on G R V)
+
+:)
 declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $froms := array:flatten($cat?from)
     let $singlequery := count($froms)=1 or empty($votable)
@@ -941,7 +959,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $v_filter := if ($vmag) then $vmag else <text>( {$cat?mag_g } - ( -0.0176 - 0.00686* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1732*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
     let $r_filter := if ($rmag) then $rmag else <text>( {$cat?mag_g } - ( 0.003226 + 0.3833* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1345*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
     let $max-mag-filters := if($votname)
-        then <text>({$cat?mag_k }&lt;{max((number($max?magK_UT), number($max?magK_AT)))} OR {$v_filter}&lt;{$max?magV} OR {$r_filter}&lt;{$max?magR})</text>
+        then <text>({$cat?mag_k }&lt;{$max?Kmag} OR {$v_filter}&lt;{$max?AO_mag} OR {$r_filter}&lt;{$max?AO_mag} OR {$cat?mag_g}&lt;{$max?AO_mag})</text>
         else <text>( ({$cat?mag_k }&lt;{$max?magK_UT} AND {$v_filter}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} AND {$r_filter}&lt;{$max?magR}) )</text>
 
     (: escape catalogs with / inside  (VizieR case):)
