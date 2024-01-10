@@ -624,9 +624,8 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
 	let $log := util:log("info", "prepare main merged table ... ")
 
     let $sci-cols :=  $identifiers-map?*[1]/* ! name(.)
-    let $ftaos-cols := ("FT identifier", "AO identifier", "Score", "Rank", "Catalog")
     let $ranking-input-params := (($bulk-search-maps?*)[1])?ranking?input-params
-    let $cols := ($sci-cols,$ftaos-cols, $ranking-input-params)
+    let $cols := ($sci-cols,"FT identifier", "AO identifier", "Score", "Rank", $ranking-input-params , "Catalog")
     let $th := <tr> {$cols ! <th>{.}</th>}</tr>
     let $trs :=  for $identifier in map:keys($identifiers-map) order by $identifier
         let $science := map:get($identifiers-map, $identifier)
@@ -655,8 +654,8 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
                             <td>{$ftao[2]}</td>
                             <td>{$scores?*[$idx]}</td>
                             <td>{$pos}</td>
-                            <td>{$cat}</td>
                             { let $tds := array:flatten($inputs?*[$idx]) return for $c at $pos in $ranking-input-params return <td>{$tds[$pos+1]}</td>}
+                            <td>{$cat}</td>
                         </tr>
 
     let $table := <table class="table table-bordered table-light table-hover datatable">
