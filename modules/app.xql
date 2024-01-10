@@ -614,7 +614,7 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
     let $votables := jmmc-tap:table2votable($table, "targets", 500) :)
 
 
-    let $bulk-search-maps :=  map:merge((
+    let $bulk-search-map :=  map:merge((
         for $cat-name in $catalogs-to-query
         let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
         let $res  := app:bulk-search($votable, $max, $cat )
@@ -624,17 +624,17 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
 	let $log := util:log("info", "prepare main merged table ... ")
 
     let $sci-cols :=  $identifiers-map?*[1]/* ! name(.)
-    let $ranking-input-params := (($bulk-search-maps?*)[1])?ranking?input-params
+    let $ranking-input-params := (($bulk-search-map?*)[1])?ranking?input-params
     let $cols := ($sci-cols,"FT identifier", "AO identifier", "Score", "Rank", $ranking-input-params , "Catalog")
     let $th := <tr> {$cols ! <th>{.}</th>}</tr>
     let $trs :=  for $identifier in map:keys($identifiers-map) order by $identifier
         let $science := map:get($identifiers-map, $identifier)
         return
             for $cat in $catalogs-to-query
-                let $ftaos := $bulk-search-maps($cat)?ranking?ftaos
-                let $scores := $bulk-search-maps($cat)?ranking?scores
-                let $science-idx := $bulk-search-maps($cat)?ranking?sciences-idx?($identifier)
-                let $inputs := $bulk-search-maps($cat)?ranking?inputs
+                let $ftaos := $bulk-search-map($cat)?ranking?ftaos
+                let $scores := $bulk-search-map($cat)?ranking?scores
+                let $science-idx := $bulk-search-map($cat)?ranking?sciences-idx?($identifier)
+                let $inputs := $bulk-search-map($cat)?ranking?inputs
             (:
                         { count( $science-idx ) } configurations :
                         <table class="table table-bordered table-light table-hover">
@@ -665,7 +665,7 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
     let $votable := jmmc-tap:table2votable($table, "targets")
 
     let $error-report := for $cat in $catalogs-to-query
-        let $info := $bulk-search-maps($cat)?ranking
+        let $info := $bulk-search-map($cat)?ranking
         let $error := $info?error
         where exists($error)
         return
@@ -673,7 +673,7 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
             {$error}<br/> query was for {$info?cat}: <br/>{$info?query}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
 
-    let $error-report := for $ranking in $bulk-search-maps?*?ranking
+    let $error-report := for $ranking in $bulk-search-map?*?ranking
         let $error := $ranking?error
         where exists($error)
         return
@@ -684,7 +684,7 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
 
     let $log := util:log("info", "DONE : main table merged")
 
-    let $targets :=<div><h3>{ count($table//tr[td]) }/{ count($bulk-search-maps?*?ranking?scores?*) } best proposed configurations for your {count(map:keys($identifiers-map))} targets (top 20)
+    let $targets :=<div><h3>{ count($table//tr[td]) }/{ count($bulk-search-map?*?ranking?scores?*) } best proposed configurations for your {count(map:keys($identifiers-map))} targets (top 20)
         <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="input.vot">votable</a>&#160;
         </h3>
         {$error-report}
@@ -699,7 +699,7 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-warning bg-opacity-10 border border-warning border-opacity-10 rounded-2">UT compliancy</small> or
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-danger bg-opacity-10 border border-danger border-opacity-10 rounded-2">not compatible / unknown</small>
         </p>
-        , $bulk-search-maps?*?html
+        , $bulk-search-map?*?html
         )
 };
 
@@ -808,7 +808,8 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             </table>
     let $log := util:log("info", "done ("||seconds-from-duration(util:system-time()-$start-time)||"s)")
     let $nb_rows := count($votable//*:TR)
-    return map { "html":
+    return map { "votable":$votable,
+        "html":
         <div class="{if($cat?main_cat) then () else "extcats d-none"}">
         <h3>
             {$cat?cat_name} ({$nb_rows})&#160;
