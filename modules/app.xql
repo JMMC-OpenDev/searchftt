@@ -710,7 +710,6 @@ declare function app:bulk-search($input-votable, $max, $cat) {
     let $query :=  app:build-query((), $input-votable, $max, $cat)
     let $query-code := <div class="extquery d-none">{for $q in $query return <pre><br/>{data($q)}<br/></pre>}</div>
     let $max-rec := $max?rec * count($input-votable//*:TR) * 100 (: TODO show this magic value in doc :)
-    let $votable := <error>SKIPPED</error>
     let $votable :=
         try{
             if(exists(request:get-parameter("dry", ())))
