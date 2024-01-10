@@ -624,8 +624,9 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
 	let $log := util:log("info", "prepare main merged table ... ")
 
     let $sci-cols :=  $identifiers-map?*[1]/* ! name(.)
-    let $ftaos-cols := ("FT identifier", "AO identifier", "Score", "Rank", "Catalog", "Input (sci_Kmag, ft_Kmag, sci_ft_dist, ao_Rmag, sci_ao_dist, ft_ao_dist)")
-    let $cols := ($sci-cols,$ftaos-cols)
+    let $ftaos-cols := ("FT identifier", "AO identifier", "Score", "Rank", "Catalog")
+    let $ranking-input-params := (($bulk-search-maps?*)[1])?ranking?input-params
+    let $cols := ($sci-cols,$ftaos-cols, $ranking-input-params)
     let $th := <tr> {$cols ! <th>{.}</th>}</tr>
     let $trs :=  for $identifier in map:keys($identifiers-map) order by $identifier
         let $science := map:get($identifiers-map, $identifier)
@@ -655,7 +656,7 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
                             <td>{$scores?*[$idx]}</td>
                             <td>{$pos}</td>
                             <td>{$cat}</td>
-                            <td>{string-join($inputs?*[$idx], ', ')}</td>
+                            { let $tds := array:flatten($inputs?*[$idx]) return for $c at $pos in $ranking-input-params return <td>{$tds[$pos+1]}</td>}
                         </tr>
 
     let $table := <table class="table table-bordered table-light table-hover datatable">
@@ -830,6 +831,7 @@ declare function app:get-ranking($votable, $cat, $max) {
         let $internal-match-query := app:build_internal_query($votable, "internal", $cat, $max)
         let $res := jmmc-tap:tap-adql-query("http://tap.jmmc.fr/vollt/tap/sync", $internal-match-query, $votable, -1, "votable/td", "internal")
         let $log := util:log("info", "internal match field count = "|| count($res//*:FIELD) || " rows count = "|| count($res//*:TR) )
+
         let $colidx := map:merge( for $e at $pos in $res//*:FIELD/@name return map:entry(replace(lower-case($e),"computed_",""), $pos) )
         let $log := util:log("info", serialize( map:keys($colidx) => sort() ))
 
@@ -841,16 +843,14 @@ declare function app:get-ranking($votable, $cat, $max) {
            mag_g_ao mag_g_ft mag_ks_ao mag_ks_ft mag_r_ao mag_r_ft
            mag_v_ao mag_v_ft otype_txt_ao otype_txt_ft pmdec_ao pmdec_ft pmra_ao pmra_ft ra_ao ra_ft science sep_ft_ao source_id_ao source_id_ft ut_flag_ao ut_flag_ft
         :)
+        let $input-params := ("mag_ks_ft","cat_dist_as_ft","mag_r_ao","cat_dist_as_ao","sep_ft_ao")
         let $inputs := array{
                  for $tr at $pos in $res//*:TR
                     return array{
                         (
                         0
-                        , number($tr/*:TD[$colidx?mag_ks_ft])
-                        , number($tr/*:TD[$colidx?cat_dist_as_ft])
-                        , number($tr/*:TD[$colidx?mag_r_ao])
-                        , number($tr/*:TD[$colidx?cat_dist_as_ao])
-                        , number($tr/*:TD[$colidx?sep_ft_ao])
+                        , for $p in $input-params
+                            return number($tr/*:TD[$colidx($p)])
                         )
                     }
             }
@@ -868,7 +868,7 @@ declare function app:get-ranking($votable, $cat, $max) {
                 return map:entry($science,$pos)
         ))
         return
-            map{"cat":$cat?cat_name, "error":$error, "query": $internal-match-query, "sciences-idx" : $map-by-sci , "ftaos": $ftaos ,"scores": $scores, "inputs":$inputs}
+            map{"cat":$cat?cat_name, "error":$error, "query": $internal-match-query, "sciences-idx" : $map-by-sci , "ftaos": $ftaos ,"scores": $scores, "inputs":$inputs, "input-params":$input-params}
 };
 
 declare function app:build_internal_query($votable, $table-name, $cat, $max){
