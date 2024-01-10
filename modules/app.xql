@@ -47,7 +47,7 @@ declare variable $app:json-conf :='{
         "max_declinaison" : 40,
         "max_rec" : 25,
         "max_result_table_rows" : 1000,
-        "prefered_catalog" : "esagaia3"
+        "preferred_bulk_catalog" : "Gaia DR3"
     },
     "extended-cols" : [ "pmra", "pmdec", "pmde", "epoch", "cat_dist_as", "today_dist_as"],
     "samestar-dist_deg" : 2.78E-4,
@@ -180,7 +180,7 @@ declare variable $app:conf := parse-json($app:json-conf);
  : @return a map with default or overriden values to use in the application.
 :)
 declare function app:defaults() as map(*){
-    let $sections := ("max", "prefered")
+    let $sections := ("max", "preferred")
     return
     map:merge(
         for $section in $sections
@@ -191,7 +191,7 @@ declare function app:defaults() as map(*){
                     let $map-key:=replace($key, $section-prefix, "")
                     let $map-info-key:=$map-key||"_info"
                     let $conf := $app:conf?default($key)
-                    let $param := (request:get-parameter($key, ""))[1] (: accept one param from uri or post payload :)
+                    let $param := (request:get-parameter($key, ()))[1] (: accept one param from uri or post payload :)
                     let $map-info:= if( exists($param) and ( string($param) != string($conf) )) then <mark title="overridden by user : default conf is {$conf}">{$param}</mark> else $conf
                     let $map-value:= if( exists($param) ) then
                             try{
@@ -528,15 +528,15 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
                 <input name="max_{$k}" value="{$v}" class="form-control"/>
         </div></div>
     let $default-catalogs := for $cat in $app:conf?catalogs?* where exists($cat?bulk) order by $cat?main_cat descending return $cat?cat_name
-    let $user-catalogs := request:get-parameter("catalogs", ())
+    let $catalogs := if(exists($catalogs)) then $catalogs else $defaults?preferred?bulk_catalog
+    let $log := util:log("info", "preferred catalog:" || string-join(map:keys($defaults?preferred), ", "))
     let $cats-params := for $catalog in $default-catalogs
         return
             <div class="p-2"><div class="input-group">
             <div class="input-group-text">
-                { element input { attribute class {"form-check-input"}, attribute type {"checkbox"}, attribute name {"catalogs"}, attribute value {$catalog}, if (empty($user-catalogs) or $catalog=$user-catalogs) then attribute checked {"true"}  else ()} }
+                { element input { attribute class {"form-check-input"}, attribute type {"checkbox"}, attribute name {"catalogs"}, attribute value {$catalog}, if ($catalog=$catalogs) then attribute checked {"true"}  else ()} }
             </div>    <span class="form-control">{$catalog}</span>
             </div></div>
-    let $user-catalogs := if( exists($user-catalogs) ) then $user-catalogs else $default-catalogs
     let $identifiers-from-file := app:get-identifiers-from-file($indentifiersFile)
     return
     (
@@ -571,7 +571,7 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
     ,
     if (exists($identifiers[string-length()>0])) then
         (
-            app:searchftt-bulk-list($identifiers, $max, $user-catalogs),
+            app:searchftt-bulk-list($identifiers, $max, $catalogs),
             app:datatable-script(),
             <p><i class="bi bi-info-circle-fill"></i>&#160;<kbd>Shift</kbd> click in the column order buttons to combine a multi column sorting.</p>
         )
