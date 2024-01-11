@@ -53,9 +53,12 @@ declare variable $app:json-conf :='{
         "max_declinaison" : 40,
         "max_rec" : 25,
         "max_result_table_rows" : 1000,
+        "max_rank" : 20,
+        "max_rankbulk_doc" : "max number of best AOFT tuples sorted by score",
+
         "preferred_bulk_catalog" : "Gaia DR3"
     },
-    "extended-cols" : [ "pmra", "pmdec", "pmde", "epoch", "cat_dist_as", "today_dist_as"],
+    "extended-cols" : [ "pmra", "pmdec", "pmde", "epoch", "cat_dist_as", "today_dist_as", "id", "str_source_id" ],
     "samestar-dist_deg" : 2.78E-4,
     "samestar-dist_as" : 1,
     "catalogs":{
@@ -226,10 +229,34 @@ declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*
 };
 
 declare function app:datatable-script(){
+    (: TODO try to avoid hardcoded indexes for datacolumns :)
     <script type="text/javascript">
         var formatTable = true; // TODO enhance table metadata so we rely on it and limit formating on some columns
         $(document).ready(function() {{
-        $('.datatable').DataTable( {{
+        // bulk filter
+        const min_score = document.querySelector('#min_score');
+        const max_rank = document.querySelector('#max_rank');
+
+        // Custom range filtering function
+        DataTable.ext.search.push(function (settings, data, dataIndex) {{
+            // Don t filter on anything other than "bulkTable"
+            if ( settings.nTable.id !== 'bulkTable' ) {{
+                return true;
+            }}
+
+            let min_s = parseFloat(min_score.value, 10) || 0;
+            let s = parseFloat(data[9],10) || 0;
+
+            let max_r = parseInt(max_rank.value) || 100;
+            let r = parseInt(data[10]) || 100;
+
+            if ( ( r &lt;= max_r ) &amp;&amp; ( s &gt;= min_s ) ) {{
+                return true;
+            }}
+            return false;
+        }});
+
+        var tables = $('.datatable').DataTable( {{
             /* */
             "aoColumnDefs": [
             {{
@@ -247,7 +274,7 @@ declare function app:datatable-script(){
             }},
             ],
             "paging": false,"scrollX": true,"scrollY": 600, "scrollResize": true,"scrollCollapse": true,
-            "searching":true,"info": false,"order": [],
+            "searching":true,"info": true,"order": [],
             "dom": 'Bfrtip',
             "buttons": ['pageLength', 'colvis','csv','copy'  ],
             "lengthMenu": [
@@ -255,6 +282,10 @@ declare function app:datatable-script(){
                 [10, 25, 50, 100, "All"]],
             "iDisplayLength": 25
         }});
+
+        // Changes to the inputs will trigger a redraw to update the table
+        min_score.addEventListener('input', function () {{ tables.draw(); }});
+        max_rank.addEventListener('input', function () {{ tables.draw(); }});
 
         }});
     </script>
@@ -579,16 +610,19 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
                 <div class="col-sm-2"><input type="submit" class="btn btn-primary"/></div>
                 <div class="col-sm-2"><a href="bulk.html" class="btn btn-outline-secondary" role="button"> Reset <i class="bi bi-arrow-clockwise"></i></a></div>
             </div>
+
+            {
+                if (exists($identifiers[string-length()>0])) then
+                    (
+                        app:searchftt-bulk-list($identifiers, $max, $catalogs),
+                        app:datatable-script(),
+                        <p><i class="bi bi-info-circle-fill"></i>&#160;<kbd>Shift</kbd> click in the column order buttons to combine a multi column sorting.</p>
+                    )
+                else ()
+            }
+
         </form>
     </div>
-    ,
-    if (exists($identifiers[string-length()>0])) then
-        (
-            app:searchftt-bulk-list($identifiers, $max, $catalogs),
-            app:datatable-script(),
-            <p><i class="bi bi-info-circle-fill"></i>&#160;<kbd>Shift</kbd> click in the column order buttons to combine a multi column sorting.</p>
-        )
-    else ()
     )
 };
 
@@ -623,10 +657,12 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
     (: Rebuild the table (and votable) with a summary of what we have in the catalogs :)
 	let $log := util:log("info", "prepare main merged table ... ")
 
+    let $detail_cols := for $e in (array:flatten($app:conf?extended-cols)) return lower-case($e)
+
     let $sci-cols :=  $identifiers-map?*[1]/* ! name(.)
     let $ranking-input-params := (($bulk-search-map?*)[1])?ranking?input-params
     let $cols := ($sci-cols,"FT identifier", "AO identifier", "Score", "Rank", $ranking-input-params , "Catalog")
-    let $th := <tr> {$cols ! <th>{.}</th>}</tr>
+    let $th := <tr> {$cols ! <th>{if(.=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()} {.}</th>}</tr>
     let $trs :=  for $identifier in map:keys($identifiers-map) order by $identifier
         let $science := map:get($identifiers-map, $identifier)
         return
@@ -645,11 +681,11 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
                 let $ordered-science-idx := for $idx in $science-idx order by $scores?*[$idx] descending return $idx
             return
                 for $idx at $pos in $ordered-science-idx
-                    where $pos <= 20
+                    where number($scores?*[$idx]) > 0  and $pos <= $max?rank
                     let $ftao := $ftaos?*[$idx]?*
                     return
                         <tr>
-                            {for $col in $sci-cols return <td>{data($science/*[name(.)=$col])}</td> }
+                            {for $col in $sci-cols return <td>{if($col=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()}{data($science/*[name(.)=$col])}</td> }
                             <td>{$ftao[1]}</td>
                             <td>{$ftao[2]}</td>
                             <td>{$scores?*[$idx]}</td>
@@ -658,11 +694,11 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
                             <td>{$cat}</td>
                         </tr>
 
-    let $table := <table class="table table-bordered table-light table-hover datatable">
+    let $table := <table class="table table-bordered table-light table-hover datatable" id="bulkTable">
         <thead>{$th}</thead>
         {$trs}
         </table>
-    let $votable := jmmc-tap:table2votable($table, "targets")
+    (: Maybe later : let $votable := jmmc-tap:table2votable($table, "targets") :)
 
     let $error-report := for $cat in $catalogs-to-query
         let $info := $bulk-search-map($cat)?ranking
@@ -684,11 +720,20 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
 
     let $log := util:log("info", "DONE : main table merged")
 
-    let $targets :=<div><h3>{ count($table//tr[td]) }/{ count($bulk-search-map?*?ranking?scores?*) } best proposed configurations for your {count(map:keys($identifiers-map))} targets (top 20)
-        <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="input.vot">votable</a>&#160;
+    let $targets :=<div><h3>{ count($table//tr[td]) } best proposed configurations for your {count(map:keys($identifiers-map))} targets (top {$max?rank} and non null for each science source { count( $bulk-search-map?*?ranking?scores?*[number(.)>0] ) }/{ count( $bulk-search-map?*?ranking?scores?* ) })
+        <!-- Maybe later : <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="input.vot">votable</a>&#160; -->
         </h3>
         {$error-report}
-        {$table}</div>
+        {$table}
+
+        <div class="p-2 d-flex">
+            <div class="p-2"><div class="input-group"><span class="input-group-text">Min score:</span><input type="text" id="min_score" name="min_score" value="0"/></div></div>
+            <div class="p-2"><div class="input-group"><span class="input-group-text">Max rank:</span><input type="text" id="max_rank" name="max_rank" value="{$max?rank}"/></div></div>
+            <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/aspro.xql">Get my ASPRO2 file 🤩</button></div>
+            <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/test.xql">Test this list</button></div>
+        </div>
+
+    </div>
 
     return
         (<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>
@@ -745,6 +790,8 @@ declare function app:bulk-search($input-votable, $max, $cat) {
                 {util:log("error", data($votable))}
             </div>
         else
+            let $detail_cols := for $e in (array:flatten($app:conf?extended-cols)) return lower-case($e)
+            let $detail_fields_pos := for $e at $pos in $votable//*:FIELD/@name return if(lower-case($e)=$detail_cols) then $pos else ()
 
             let $field_names := for $e in $votable//*:FIELD/@name return lower-case($e)
             let $science_idx := index-of($field_names, "science")
@@ -763,7 +810,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             return
 
             <table class="table table-light table-bordered table-hover datatable exttable">
-                <thead><tr>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{data($field/@name)}</th>}<th title="number of stars returned for the same science target">commons</th></tr></thead>
+                <thead><tr>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{if($field/@name=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()}{data($field/@name)}</th>}<th title="number of stars returned for the same science target">commons</th></tr></thead>
                 {
                     for $src_tr in subsequence($trs,1,$max?result_table_rows) group by $science := $src_tr/*:TD[$science_idx]
                     let $group_size := count($src_tr)
@@ -787,7 +834,7 @@ declare function app:bulk-search($input-votable, $max, $cat) {
 
                     return <tr>
                             {for $td at $pos in $tr/*:TD
-                            return <td>{
+                            return <td>{if($pos=$detail_fields_pos) then attribute {"class"} {"d-none extcols table-primary"} else ()}{
                                 switch($pos)
                                     case $source_id_idx return $target_link
                                     case $mag_k_idx return
@@ -840,9 +887,9 @@ declare function app:get-ranking($votable, $cat, $max) {
         (: WebService ask for : [[sci_Kmag, ft_Kmag, sci_ft_dist, ao_Rmag, sci_ao_dist, ft_ao_dist]] :)
         (: at_flag_ao at_flag_ft cat_dist_as_ao cat_dist_as_ft dec_ao dec_ft epoch_ao epoch_ft j2000_dist_as_ao j2000_dist_as_ft j2024_dist_as_ao j2024_dist_as_ft
            mag_g_ao mag_g_ft mag_ks_ao mag_ks_ft mag_r_ao mag_r_ft
-           mag_v_ao mag_v_ft otype_txt_ao otype_txt_ft pmdec_ao pmdec_ft pmra_ao pmra_ft ra_ao ra_ft science sep_ft_ao source_id_ao source_id_ft ut_flag_ao ut_flag_ft
+           mag_v_ao mag_v_ft otype_txt_ao otype_txt_ft pmdec_ao pmdec_ft pmra_ao pmra_ft ra_ao ra_ft science ft_ao_dist_as source_id_ao source_id_ft ut_flag_ao ut_flag_ft
         :)
-        let $input-params := ("mag_ks_ft","cat_dist_as_ft","mag_r_ao","cat_dist_as_ao","sep_ft_ao")
+        let $input-params := ("mag_ks_ft","cat_dist_as_ft","mag_r_ao","cat_dist_as_ao","ft_ao_dist_as")
         let $inputs := array{
                  for $tr at $pos in $res//*:TR
                     return array{
@@ -859,7 +906,7 @@ declare function app:get-ranking($votable, $cat, $max) {
         let $log := util:log("info", "scores length : "|| count($scores?*))
 
         let $ftaos := array{ for $tr at $pos in $res//*:TR
-              return array{ data($tr/*:TD[$colidx?source_id_ft]), data($tr/*:TD[$colidx?source_id_ao]) }
+              return array{ data($tr/*:TD[$colidx?str_source_id_ft]), data($tr/*:TD[$colidx?str_source_id_ao]) }
             }
 
         let $map-by-sci  := map:merge((
@@ -878,8 +925,8 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
     let $vmag := $cat?mag_v
     let $rmag := $cat?mag_r
     let $computed_prefix := if($vmag and $rmag ) then () else "computed_"
-    let $ft-filters := <text>(ft.mag_ks &lt; {max((number($max?magK_UT), number($max?magK_AT)))})</text>
-    let $ao-filters := <text>(ao.{$computed_prefix}mag_r&lt;{$max?magR})</text>
+    let $ft-filters := <text>(ft.mag_ks &lt; {$max?Kmag})</text>
+    let $ao-filters := <text>(ao.mag_g&lt;{$max?AO_mag}) OR (ao.{$computed_prefix}mag_r&lt;{$max?AO_mag}) OR (ao.{$computed_prefix}mag_v&lt;{$max?AO_mag})</text>
 
     let $ftao-dist := <text>DISTANCE( POINT( 'ICRS', ft.ra, ft.dec),POINT('ICRS', ao.ra, ao.dec))*3600.0</text>
     let $dist-filter := <text>({$ftao-dist} &lt; 60)</text>
@@ -888,18 +935,16 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
         "SELECT",
         string-join(
             ("ft.science as science",
-            $ftao-dist || " as sep_ft_ao",
+            $ftao-dist || " as ft_ao_dist_as",
             for $c in $colnames[not(.="science")] return
                 for $type in ("ft", "ao")
-                    let $tc := if (contains($c, "source_id") and $cat?simbad_prefix_id) then <t> '{$cat?simbad_prefix_id}' || {$type}.{$c}</t> else string-join(($type, ".", $c))
-                    return
-                        string-join( ($tc, " as ", $c, "_"[exists($c)], $type) )
+                    return string-join( (($type, ".", $c), " as ", $c, "_"[exists($c)], $type) )
             ),", "),
         " FROM TAP_UPLOAD."||$table-name||" as ft , TAP_UPLOAD."||$table-name||" as ao ",
         " WHERE " || $ft-filters || " AND " || $ao-filters || " AND " || $dist-filter
         ),"&#10;")
 
-    let $log := util:log("info", "query : " || $internal-match)
+    let $log := util:log("info", "internal match query : " || $internal-match)
 
     return
         $internal-match
@@ -1004,6 +1049,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $query := <text>{$comments}
     SELECT
         {$science-name-col}
+        {if ( exists($cat?simbad_prefix_id) ) then "'"||$cat?simbad_prefix_id||"' ||" else () } {$cat?source_id} as str_source_id,
         {$cat?source_id} as source_id,
         {$distance_J2000},
         {$distance_catalog},
