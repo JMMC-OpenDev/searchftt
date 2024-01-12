@@ -654,7 +654,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
     let $bulk-search-map :=  map:merge((
         for $cat-name in $catalogs-to-query
         let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
-        let $res  := app:bulk-search($votable, $max, $cat )
+        let $res  := app:bulk-search($votable, $cat )
         return map:entry($cat-name,$res)))
 
     (: Rebuild the table (and votable) with a summary of what we have in the catalogs :)
@@ -752,9 +752,8 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
 
 declare function app:bulk-form-test($identifiers as xs:string*, $catalogs as xs:string*) {
     let $config := app:config()
-    let $max := $config("max")
     let $catalogs := if(exists($catalogs)) then $catalogs else $config?preferred?bulk_catalog
-    let $res := app:searchftt-bulk-list($identifiers, $max, $catalogs)
+    let $res := app:searchftt-bulk-list($identifiers, $catalogs)
 
     (: res structure :
         - $res?identifiers-map : map {$identifier : id-info}
@@ -778,14 +777,12 @@ declare function app:bulk-form-test($identifiers as xs:string*, $catalogs as xs:
                         }
                     }
     :)
+
     let $sciences := $res?identifiers-map
-
-
     let $targets-map := $res($catalogs)?targets-map
     let $ftaos := $res?*?ranking?ftaos
     let $fts  := for $ftao in $ftaos?* group by $ft := ($ftao?*)[1] return $ft
     let $aos  := for $ftao in $ftaos?* group by $ao := ($ftao?*)[2] return $ao
-
 
     return
         (
@@ -810,12 +807,15 @@ declare function app:bulk-form-test($identifiers as xs:string*, $catalogs as xs:
         )
 };
 
-declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map(*), $catalogs-to-query as xs:string* ) {
+declare function app:searchftt-bulk-list($identifiers as xs:string*, $catalogs-to-query as xs:string* ) {
     let $log := util:log("info", "catalogs to query : " || string-join($catalogs-to-query))
     (: Check that we have requested catalog in our conf :)
     let $catalogs-to-query := for $cat-name in $catalogs-to-query
         where exists($app:conf?catalogs?*[?cat_name=$cat-name])
         return $cat-name
+
+    let $config := app:config()
+    let $catalogs-to-query := if(exists($catalogs-to-query)) then $catalogs-to-query else $config?preferred?bulk_catalog
 
     (: Cleanup requested ids and get Simbad or basic informations for each of them :)
     let $ids := distinct-values($identifiers ! tokenize(., ";")!normalize-space(.))[string-length()>0]
@@ -838,16 +838,18 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
         map:entry("identifiers-map",$identifiers-map),
         for $cat-name in $catalogs-to-query
         let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
-        let $res  := app:bulk-search($votable, $max, $cat )
+        let $res  := app:bulk-search($votable, $cat )
         return map:entry($cat-name,$res)))
 
     return
         $bulk-search-map
 };
 
-declare function app:bulk-search($input-votable, $max, $cat) {
+declare function app:bulk-search($input-votable, $cat) {
     let $start-time := util:system-time()
 	let $log := util:log("info", "searching bulk ftt in "||$cat?cat_name||" ...")
+    let $config := app:config()
+    let $max := $config("max")
     let $query :=  app:build-query((), $input-votable, $max, $cat)
     let $query-code := <div class="extquery d-none">{for $q in $query return <pre><br/>{data($q)}<br/></pre>}</div>
     let $max-rec := $max?rec * count($input-votable//*:TR) * 100 (: TODO show this magic value in doc :)

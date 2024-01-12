@@ -9,12 +9,8 @@ let $headers := response:set-header("Content-Disposition",' attachment; filename
 let $identifiers := request:get-parameter("identifiers",())
 let $catalogs := request:get-parameter("catalogs",())
 
-(: get conf TODO REMOVE IT :)
-let $config := app:config()
-let $max := $config("max")
-
-let $catalogs := if(exists($catalogs)) then $catalogs else $config?preferred?bulk_catalog
-let $res := app:searchftt-bulk-list($identifiers, $max, $catalogs)
+(: compute lists :)
+let $res := app:searchftt-bulk-list($identifiers, $catalogs)
 
 (: res structure :
     - $res?identifiers-map : map {$identifier : id-info}
