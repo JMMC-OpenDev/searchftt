@@ -381,11 +381,11 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
     let $fov_deg := 3 * $max?dist_as div 3600
 
     let $ids := distinct-values($identifiers ! tokenize(., ";") ! normalize-space(.))[string-length()>0]
-    let $id2target := app:resolve-by-names($ids)
+    let $targets-maps := app:resolve-by-names($ids)
     let $count := count($ids)
     let $lis :=
         for $id at $pos in $ids
-        let $s := map:get($id2target, $id)
+        let $s := map:get($targets-maps, $id)
         let $log := util:log("info", <txt>loop {$pos} / {$count} : {$id} {$s} </txt>)
         let $simbad-link := if($s/@position-only) then <a target="_blank" href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={encode-for-uri($id)}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec">{$id}</a> else <a target="_blank" href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}">{$id}</a>
         let $ra := $s/ra let $dec := $s/dec
@@ -506,11 +506,11 @@ declare function app:search($id, $max, $s, $cat) {
                     let $trs := $votable//*:TABLEDATA/*
                     (: compute simbad id adding a prefix to build a valid identifier :)
                     let $targets-ids := $trs/*[$source_id_idx]!concat($cat?simbad_prefix_id, .)
-                    let $id2target := app:resolve-by-names($targets-ids)
+                    let $targets-maps := app:resolve-by-names($targets-ids)
                     for $tr in $trs return
                         <tr>{
                             let $simbad_id := $cat?simbad_prefix_id||$tr/*[$source_id_idx]
-                            let $simbad := map:get($id2target, $simbad_id)
+                            let $simbad := map:get($targets-maps, $simbad_id)
 
                             let $target_link := if (exists($simbad/ra/text())) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
                                 let $ra := $tr/*[index-of($field_names, "ra")]
@@ -554,7 +554,11 @@ declare function app:get-identifiers-from-file($indentifiersFile as xs:string*){
     else ()
 };
 
-declare %templates:wrap function app:bulk-form($node as node(), $model as map(*), $identifiers as xs:string*, $format as xs:string*, $catalogs as xs:string*, $indentifiersFile as xs:string*) {
+declare %templates:wrap function app:bulk-form($node as node(), $model as map(*), $identifiers as xs:string*, $catalogs as xs:string*) {
+    app:bulk-form-html($identifiers, $catalogs)
+};
+
+declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:string*) {
     let $config := app:config()
     let $max := $config("max")
     (: was here before max-mags to convey mags parameters
@@ -577,11 +581,10 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
     let $cats-params := for $catalog in $default-catalogs
         return
             <div class="p-2"><div class="input-group">
-            <div class="input-group-text">
-                { element input { attribute class {"form-check-input"}, attribute type {"checkbox"}, attribute name {"catalogs"}, attribute value {$catalog}, if ($catalog=$catalogs) then attribute checked {"true"}  else ()} }
-            </div>    <span class="form-control">{$catalog}</span>
+                <div class="input-group-text">
+                    { element input { attribute class {"form-check-input"}, attribute type {"checkbox"}, attribute name {"catalogs"}, attribute value {$catalog}, if ($catalog=$catalogs) then attribute checked {"true"}  else ()} }
+                </div>    <span class="form-control">{$catalog}</span>
             </div></div>
-    let $identifiers-from-file := app:get-identifiers-from-file($indentifiersFile)
     return
     (
     <div>
@@ -614,7 +617,7 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
             {
                 if (exists($identifiers[string-length()>0])) then
                     (
-                        app:searchftt-bulk-list($identifiers, $max, $catalogs),
+                        app:searchftt-bulk-list-html($identifiers, $max, $catalogs),
                         app:datatable-script(),
                         <p><i class="bi bi-info-circle-fill"></i>&#160;<kbd>Shift</kbd> click in the column order buttons to combine a multi column sorting.</p>
                     )
@@ -626,7 +629,7 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
     )
 };
 
-declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map(*), $catalogs-to-query as xs:string* ) {
+declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max as map(*), $catalogs-to-query as xs:string* ) {
     let $catalogs-to-query := for $cat-name in $catalogs-to-query
         where exists($app:conf?catalogs?*[?cat_name=$cat-name])
         return $cat-name
@@ -736,8 +739,7 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
     </div>
 
     return
-        (<script type="text/javascript" src="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>
-        , $targets
+        ($targets
         ,<h2>Results per catalogs.</h2>
         ,<p>By now, the ut_flag and at_flag columns are not computed in the votable but the table below ( 1=FT, 2=AO, 3=FT or AO). <br/> Magnitudes columns colors are for
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-success bg-opacity-10 border border-success border-opacity-10 rounded-2">UT and AT compliancy</small>,
@@ -748,6 +750,100 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map
         )
 };
 
+declare function app:bulk-form-test($identifiers as xs:string*, $catalogs as xs:string*) {
+    let $config := app:config()
+    let $max := $config("max")
+    let $catalogs := if(exists($catalogs)) then $catalogs else $config?preferred?bulk_catalog
+    let $res := app:searchftt-bulk-list($identifiers, $max, $catalogs)
+
+    (: res structure :
+        - $res?identifiers-map : map {$identifier : id-info}
+        - for each queried catalog :
+            - $res?$catalogName :
+                map {
+                    "error" : htmlerror
+                    "votable":$votable
+                      or
+                    "votable":$votable
+                    "html" : $html
+                    "targets-map" : map {$identifier : id-info}
+                    "ranking : map {
+                        "error": $error
+                        "query" : $query
+                        "sciences-idx" : map { $science-id : array{ $pos-idx } }
+                        "input-params" : array { $colnames }
+                        "inputs" : array { $colvalues_of_colnames }
+                        "ftaos" : array { [ft1, ao1], ... [ftn, aon] }
+                        "scores" : array { $scores }
+                        }
+                    }
+    :)
+    let $sciences := $res?identifiers-map
+
+
+    let $targets-map := $res($catalogs)?targets-map
+    let $ftaos := $res?*?ranking?ftaos
+    let $fts  := for $ftao in $ftaos?* group by $ft := ($ftao?*)[1] return $ft
+    let $aos  := for $ftao in $ftaos?* group by $ao := ($ftao?*)[2] return $ao
+
+
+    return
+        (
+            $catalogs,
+            <br/>,
+            serialize(map:keys($res?*?ranking?sciences-idx), map {"method": "json"}),
+
+            <br/>,
+            serialize($res?*?ranking?scores, map {"method": "json"}),
+            <br/>,
+            serialize($sciences, map {"method": "json"}),
+            <br/>,
+            serialize($targets-map, map {"method": "json"}),
+            <fts/>,
+            $fts,
+            <aos/>,
+            $aos,
+            (: : )
+             serialize($res, map {"method": "json"}),
+            ( : :)
+            ()
+        )
+};
+
+declare function app:searchftt-bulk-list($identifiers as xs:string*, $max as map(*), $catalogs-to-query as xs:string* ) {
+    let $log := util:log("info", "catalogs to query : " || string-join($catalogs-to-query))
+    (: Check that we have requested catalog in our conf :)
+    let $catalogs-to-query := for $cat-name in $catalogs-to-query
+        where exists($app:conf?catalogs?*[?cat_name=$cat-name])
+        return $cat-name
+
+    (: Cleanup requested ids and get Simbad or basic informations for each of them :)
+    let $ids := distinct-values($identifiers ! tokenize(., ";")!normalize-space(.))[string-length()>0]
+    let $identifiers-map := app:resolve-by-names($ids)
+
+    (: Let's build a table on top of main info so we can use it for tap votable upload later :)
+    let $cols := $identifiers-map?*[1]/* ! name(.)
+    let $th := <tr> {$cols ! <th>{.}</th>}</tr>
+    let $trs := for $star in $identifiers-map?* order by $star
+        return <tr> {for $col in $cols return <td>{data($star/*[name(.)=$col])}</td> } </tr>
+    let $table := <table class="table table-bordered table-light table-hover datatable">
+        <thead>{$th}</thead>
+        {$trs}
+        </table>
+    let $votable := jmmc-tap:table2votable($table, "targets")
+    (: TODO iterate and merge over chunk of
+    let $votables := jmmc-tap:table2votable($table, "targets", 500) :)
+
+    let $bulk-search-map :=  map:merge((
+        map:entry("identifiers-map",$identifiers-map),
+        for $cat-name in $catalogs-to-query
+        let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
+        let $res  := app:bulk-search($votable, $max, $cat )
+        return map:entry($cat-name,$res)))
+
+    return
+        $bulk-search-map
+};
 
 declare function app:bulk-search($input-votable, $max, $cat) {
     let $start-time := util:system-time()
@@ -775,20 +871,24 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             <a><error>{$err:description}</error>{$err:value}</a>
         }
 
-    let $table := if($votable/error or $votable//*:INFO[@name="QUERY_STATUS" and @value="ERROR"])
+    let $res := if($votable/error or $votable//*:INFO[@name="QUERY_STATUS" and @value="ERROR"])
          then
-            <div class="alert alert-danger" role="alert">
-                Error trying to get votable.<br/>
-                <pre>{data($votable)}</pre>
-                {util:log("error", data($votable))}
-            </div>
+            map:entry("error",
+                <div class="alert alert-danger" role="alert">
+                    Error trying to get votable.<br/>
+                    <pre>{data($votable)}</pre>
+                    {util:log("error", data($votable))}
+                </div>
+            )
         else if(not ( contains(lower-case(name($votable/*)),"votable") ) ) (: TODO throw an exception for this case on jmmc-tap side :)
         then
-            <div class="alert alert-danger" role="alert">
-                Error trying to get votable (maybe html ? '{lower-case(name($votable/*))}') : <br/>
-                {$votable}
-                {util:log("error", data($votable))}
-            </div>
+            map:entry("error",
+                <div class="alert alert-danger" role="alert">
+                    Error trying to get votable (maybe html ? '{lower-case(name($votable/*))}') : <br/>
+                    {$votable}
+                    {util:log("error", data($votable))}
+                </div>
+            )
         else
             let $detail_cols := for $e in (array:flatten($app:conf?extended-cols)) return lower-case($e)
             let $detail_fields_pos := for $e at $pos in $votable//*:FIELD/@name return if(lower-case($e)=$detail_cols) then $pos else ()
@@ -805,69 +905,75 @@ declare function app:bulk-search($input-votable, $max, $cat) {
             let $trs := $votable//*:TR
             (: compute simbad id adding a prefix to build a valid identifier :)
             let $targets-ids := $trs/*[$source_id_idx]!concat($cat?simbad_prefix_id, .)
-            let $id2target := app:resolve-by-names($targets-ids)
+            let $targets-maps := app:resolve-by-names($targets-ids)
 
-            return
+            let $nb_rows := count($votable//*:TR)
 
-            <table class="table table-light table-bordered table-hover datatable exttable">
-                <thead><tr>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{if($field/@name=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()}{data($field/@name)}</th>}<th title="number of stars returned for the same science target">commons</th></tr></thead>
-                {
-                    for $src_tr in subsequence($trs,1,$max?result_table_rows) group by $science := $src_tr/*:TD[$science_idx]
-                    let $group_size := count($src_tr)
-                    return for $tr in $src_tr
-                    let $simbad_id := $cat?simbad_prefix_id||$tr/*[$source_id_idx]
-                    let $simbad := map:get($id2target, $simbad_id)
-                    let $target_link := if (exists($simbad/ra/text())) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
-                                let $ra := $tr/*[index-of($field_names, "ra")]
-                                let $dec := $tr/*[index-of($field_names, "dec")]
-                                return <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$simbad_id}">{replace($simbad_id," ","&#160;")}</a>
-                    (: Compute flags :)
-                    let $magk := number($tr/*[$mag_k_idx])
-                    (: AT :)
-                    let $magr := number($tr/*[$mag_r_idx])
-                    let $magr_flag := if ($magr<$max?magR) then 2 else 0
-                    let $at_flag  :=  if ($magk<$max?magK_AT) then $magr_flag+1 else $magr_flag
-                    (: UT :)
-                    let $magv := number($tr/*[$mag_v_idx])
-                    let $magv_flag := if ($magv<$max?magV) then 2 else 0
-                    let $ut_flag  :=  if ($magk<$max?magK_UT) then $magv_flag+1 else $magv_flag
+            return (
+                map:entry("html",
+                    <div class="{if($cat?main_cat) then () else "extcats d-none"}">
+                    <h3>
+                        {$cat?cat_name} ({$nb_rows})&#160;
+                        <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="searchftt_{$cat?cat_name}.vot">votable</a>
+                    </h3>
 
-                    return <tr>
-                            {for $td at $pos in $tr/*:TD
-                            return <td>{if($pos=$detail_fields_pos) then attribute {"class"} {"d-none extcols table-primary"} else ()}{
-                                switch($pos)
-                                    case $source_id_idx return $target_link
-                                    case $mag_k_idx return
-                                        (attribute {"class"} {if ($magk<$max?magK_AT) then "table-success" else if ($magk<$max?magK_UT) then "table-warning" else "table-danger"}, data($td))
-                                    case $mag_v_idx return
-                                        (attribute {"class"} {if ($magv<$max?magV) then "table-success" else "table-danger"}, data($td))
-                                    case $mag_r_idx return
-                                        (attribute {"class"} {if ($magr<$max?magR) then "table-success" else "table-danger"}, data($td))
-                                    case $at_flag_idx return
-                                        $at_flag
-                                    case $ut_flag_idx return
-                                        $ut_flag
-                                    default return data($td)
-                            }</td>}
-                            <td>{$group_size}</td>
-                        </tr>
-                }
-            </table>
+                    <table class="table table-light table-bordered table-hover datatable exttable">
+                        <thead><tr>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{if($field/@name=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()}{data($field/@name)}</th>}<th title="number of stars returned for the same science target">commons</th></tr></thead>
+                        {
+                            for $src_tr in subsequence($trs,1,$max?result_table_rows) group by $science := $src_tr/*:TD[$science_idx]
+                            let $group_size := count($src_tr)
+                            return for $tr in $src_tr
+                            let $simbad_id := $cat?simbad_prefix_id||$tr/*[$source_id_idx]
+                            let $simbad := map:get($targets-maps, $simbad_id)
+                            let $target_link := if (exists($simbad/ra/text())) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
+                                        let $ra := $tr/*[index-of($field_names, "ra")]
+                                        let $dec := $tr/*[index-of($field_names, "dec")]
+                                        return <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$simbad_id}">{replace($simbad_id," ","&#160;")}</a>
+                            (: Compute flags :)
+                            let $magk := number($tr/*[$mag_k_idx])
+                            (: AT :)
+                            let $magr := number($tr/*[$mag_r_idx])
+                            let $magr_flag := if ($magr<$max?magR) then 2 else 0
+                            let $at_flag  :=  if ($magk<$max?magK_AT) then $magr_flag+1 else $magr_flag
+                            (: UT :)
+                            let $magv := number($tr/*[$mag_v_idx])
+                            let $magv_flag := if ($magv<$max?magV) then 2 else 0
+                            let $ut_flag  :=  if ($magk<$max?magK_UT) then $magv_flag+1 else $magv_flag
+
+                            return <tr>
+                                    {for $td at $pos in $tr/*:TD
+                                    return <td>{if($pos=$detail_fields_pos) then attribute {"class"} {"d-none extcols table-primary"} else ()}{
+                                        switch($pos)
+                                            case $source_id_idx return $target_link
+                                            case $mag_k_idx return
+                                                (attribute {"class"} {if ($magk<$max?magK_AT) then "table-success" else if ($magk<$max?magK_UT) then "table-warning" else "table-danger"}, data($td))
+                                            case $mag_v_idx return
+                                                (attribute {"class"} {if ($magv<$max?magV) then "table-success" else "table-danger"}, data($td))
+                                            case $mag_r_idx return
+                                                (attribute {"class"} {if ($magr<$max?magR) then "table-success" else "table-danger"}, data($td))
+                                            case $at_flag_idx return
+                                                $at_flag
+                                            case $ut_flag_idx return
+                                                $ut_flag
+                                            default return data($td)
+                                    }</td>}
+                                    <td>{$group_size}</td>
+                                </tr>
+                        }
+                    </table>
+                    {$query-code}
+                    {<code class="extdebug d-none"><br/>Catalog query duration : {seconds-from-duration(util:system-time()-$start-time)}s</code>}
+                    </div>
+                ),
+                map:entry("votable", $votable),
+                map:entry("targets-map" , $targets-maps),
+                map:entry("ranking", app:get-ranking($votable,$cat,$max))
+            )
+
     let $log := util:log("info", "done ("||seconds-from-duration(util:system-time()-$start-time)||"s)")
-    let $nb_rows := count($votable//*:TR)
-    return map { "votable":$votable,
-        "html":
-        <div class="{if($cat?main_cat) then () else "extcats d-none"}">
-        <h3>
-            {$cat?cat_name} ({$nb_rows})&#160;
-            <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="searchftt_{$cat?cat_name}.vot">votable</a>
-         </h3>
-        { $table }
-        {$query-code}
-        {<code class="extdebug d-none"><br/>Catalog query duration : {seconds-from-duration(util:system-time()-$start-time)}s</code>}
-        </div>,
-        "ranking": app:get-ranking($votable,$cat,$max)
-    }
+    return
+        map:merge($res)
+
 };
 
 (: Returns a ranking map or empty value if given votable has no data :)
@@ -1084,4 +1190,9 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         if($singlequery) then $query
         else
         ($query, $subquery)
+};
+
+declare function app:genTargetIds($names as xs:string*) as xs:string*
+{
+    $names ! translate(., ' &lt;&gt;?,;:/!*%$^&amp;~#{[|`\^@]}°', '______________________________')
 };
