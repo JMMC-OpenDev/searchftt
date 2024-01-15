@@ -729,63 +729,6 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
         )
 };
 
-declare function app:bulk-form-test($identifiers as xs:string*, $catalogs as xs:string*) {
-    let $config := app:config()
-    let $res := app:searchftt-bulk-list($identifiers, $catalogs)
-
-    (: res structure :
-        - $res?identifiers-map : map {$identifier : id-info}
-        - $res?catalogs :
-            map { $res?$catalogName :
-                map {
-                    "error" : htmlerror
-                    "votable":$votable
-                      or
-                    "votable":$votable
-                    "html" : $html
-                    "targets-map" : map {$identifier : id-info}
-                    "ranking : map {
-                        "error": $error
-                        "query" : $query
-                        "sciences-idx" : map { $science-id : array{ $pos-idx } }
-                        "input-params" : array { $colnames }
-                        "inputs" : array { $colvalues_of_colnames }
-                        "ftaos" : array { [ft1, ao1], ... [ftn, aon] }
-                        "scores" : array { $scores }
-                        }
-                    }
-                }
-    :)
-
-    let $sciences := $res?identifiers-map
-    let $targets-map := $res($catalogs)?targets-map
-    let $ftaos := $res?*?ranking?ftaos
-    let $fts  := for $ftao in $ftaos?* group by $ft := ($ftao?*)[1] return $ft
-    let $aos  := for $ftao in $ftaos?* group by $ao := ($ftao?*)[2] return $ao
-
-    return
-        (
-            $catalogs,
-            <br/>,
-            serialize(map:keys($res?*?ranking?sciences-idx), map {"method": "json"}),
-
-            <br/>,
-            serialize($res?*?ranking?scores, map {"method": "json"}),
-            <br/>,
-            serialize($sciences, map {"method": "json"}),
-            <br/>,
-            serialize($targets-map, map {"method": "json"}),
-            <fts/>,
-            $fts,
-            <aos/>,
-            $aos,
-            (: : )
-             serialize($res, map {"method": "json"}),
-            ( : :)
-            ()
-        )
-};
-
 declare function app:searchftt-bulk-list($identifiers as xs:string*, $catalogs-to-query as xs:string* ) {
     let $log := util:log("info", "catalogs to query : " || string-join($catalogs-to-query))
     (: Check that we have requested catalog in our conf :)

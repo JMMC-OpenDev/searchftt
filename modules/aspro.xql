@@ -36,6 +36,7 @@ let $res := app:searchftt-bulk-list($identifiers, $catalogs)
 
 (: TODO filter by min_score and ranking :)
 let $sciences-idx := $res?catalogs?*?ranking?sciences-idx
+let $scores := $res?catalogs?*?ranking?score
 let $ftaos := $res?catalogs?*?ranking?ftaos
 let $fts  := for $ftao in $ftaos?* group by $ft := ($ftao?*)[1] return $ft
 let $aos  := for $ftao in $ftaos?* group by $ao := ($ftao?*)[2] return $ao
@@ -138,6 +139,7 @@ return
             for $science in map:keys($sciences-idx)
             let $target-id := app:genTargetIds($science)
             let $indices := $sciences-idx($science)
+
             let $s_fts := $fts[$indices=position()]
             let $s_aos := $aos[$indices=position()]
 
