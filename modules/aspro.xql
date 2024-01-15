@@ -14,8 +14,7 @@ let $res := app:searchftt-bulk-list($identifiers, $catalogs)
 
 (: res structure :
     - $res?identifiers-map : map {$identifier : id-info}
-    - for each queried catalog :
-        - $res?$catalogName :
+    - $res?catalogs : map{ $catalogName :
             map {
                 "error" : htmlerror
                 "votable":$votable
@@ -35,9 +34,9 @@ let $res := app:searchftt-bulk-list($identifiers, $catalogs)
                 }
 :)
 
-
-let $sciences-idx := $res?*?ranking?sciences-idx
-let $ftaos := $res?*?ranking?ftaos
+(: TODO filter by min_score and ranking :)
+let $sciences-idx := $res?catalogs?*?ranking?sciences-idx
+let $ftaos := $res?catalogs?*?ranking?ftaos
 let $fts  := for $ftao in $ftaos?* group by $ft := ($ftao?*)[1] return $ft
 let $aos  := for $ftao in $ftaos?* group by $ao := ($ftao?*)[2] return $ao
 
@@ -74,16 +73,18 @@ return
     {
         for $identifier in $all-identifiers
             let $target-id := app:genTargetIds($identifier)
-            let $target := $res($catalogs)?targets-map($identifier)
-            let $target := if($target) then $target else $res?identifiers-map($identifier)
+            let $target := $res?identifiers-map($identifier)
+            let $target := if($target) then $target else $res?catalogs?*?targets-map($identifier)
+            let $name := if($target/name/text()) then $target/name/text() else $identifier
             return
                 <target id="{$target-id}">
-                    <name>{$identifier}</name>
+                    <name>{$name}</name>
                     <RA>{data($target/ra)}</RA>
                     <DEC>{data($target/dec)}</DEC>
                     <EQUINOX>2000.0</EQUINOX>
                     <PMRA>{data($target/pmra)}</PMRA>
                     <PMDEC>{data($target/pmdec)}</PMDEC>
+                    {if($target/name != $target/user_identifier) then <IDS>{$target/user_identifier/text()}</IDS> else ()}
                 </target>
                 (: <PARALLAX>376.6801</PARALLAX>
                     <PARA_ERR>0.4526</PARA_ERR>
@@ -135,13 +136,14 @@ return
         </groupMembers>
         {
             for $science in map:keys($sciences-idx)
+            let $target-id := app:genTargetIds($science)
             let $indices := $sciences-idx($science)
             let $s_fts := $fts[$indices=position()]
             let $s_aos := $aos[$indices=position()]
 
             return
                 <targetInfo>
-                    <targetRef>{app:genTargetIds($science)}</targetRef>
+                    <targetRef>{$target-id}</targetRef>
                     <groupMembers>
                         <groupRef>JMMC_AO</groupRef>
                         <targets>{string-join(app:genTargetIds($s_aos), " ")}</targets>
