@@ -642,7 +642,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
     let $detail_cols := for $e in (array:flatten($app:conf?extended-cols)) return lower-case($e)
 
     let $sci-cols :=  $identifiers-map?*[1]/* ! name(.)
-    let $ranking-input-params := (($bulk-search-map?*)[1])?ranking?input-params
+    let $ranking-input-params := (($bulk-search-map?catalogs?*)[1])?ranking?input-params
     let $cols := ($sci-cols,"FT identifier", "AO identifier", "Score", "Rank", $ranking-input-params , "Catalog")
     let $th := <tr> {$cols ! <th>{if(.=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()} {.}</th>}</tr>
     let $trs :=  for $identifier in map:keys($identifiers-map) order by $identifier
