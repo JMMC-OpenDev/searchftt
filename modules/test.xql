@@ -39,18 +39,26 @@ import module namespace app="http://exist.jmmc.fr/searchftt/apps/searchftt/templ
 
     let $sciences := $res?identifiers-map
     let $scores := $res?catalogs?*?ranking?scores
-    let $targets-map := $res($catalogs)?targets-map
+    let $targets-map := $res?catalogs?*?targets-map
     let $ftaos := $res?catalogs?*?ranking?ftaos
     let $fts  := for $ftao in $ftaos?* group by $ft := ($ftao?*)[1] return $ft
     let $aos  := for $ftao in $ftaos?* group by $ao := ($ftao?*)[2] return $ao
 
+    let $sciences-idx := $res?catalogs?*?ranking?sciences-idx
+    let $distinct-sciences := distinct-values(for $m in $sciences-idx return map:keys($m))
+
     return
         (
             $catalogs,
+            <distinct-sciences/>,
+            serialize($distinct-sciences, map {"method": "adaptive"}),
             <count-scores/>,
-            count($scores),
+            count($scores?*),
+            map:for-each( $res?catalogs, function ($ck, $cv) { " " || $ck || ':' ||count($cv?ranking?scores)}),
             <count-ftaos/>,
-            count($ftaos),
+            count($ftaos?*),
+            map:for-each( $res?catalogs, function ($ck, $cv) { " " || $ck || ':' ||count($cv?ftaos)}),
+
             <scores/>,
             serialize($scores, map {"method": "adaptive"}),
             <ftaos/>,

@@ -591,7 +591,7 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
     (
     <div>
         <h1>Bulk form for fast and efficient queries !</h1>
-        <form method="post" action="bulk.html"> (: force action to avoid param duplication on post :)
+        <form method="post" action="bulk.html"> <!-- force action to avoid param duplication on post -->
             <div class="d-flex p-2">
             <div class="input-group">
                 <input type="text" class="form-control" placeholder="Enter your science identifiers or coordinates. Use semicolon as separator, e.g : 0 0; 4.321 6.543; HD123; HD234 " aria-label="Science identifiers (semicolon separator)" id="identifiers" name="identifiers" value="{$identifiers}"/>
@@ -637,7 +637,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
     let $identifiers-map := $bulk-search-map?identifiers-map
 
     (: Rebuild the table (and votable) with a summary of what we have in the catalogs :)
-	let $log := util:log("info", "merge main table to show ranked results... ")
+	let $log := util:log("info", "merge main table to show ranked results ("|| count($identifiers-map?*)||"))... ")
 
     let $detail_cols := for $e in (array:flatten($app:conf?extended-cols)) return lower-case($e)
 
@@ -648,22 +648,17 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
     let $trs :=  for $identifier in map:keys($identifiers-map) order by $identifier
         let $science := map:get($identifiers-map, $identifier)
         return
-            for $cat in $catalogs-to-query
-                let $ftaos := $bulk-search-map($cat)?ranking?ftaos
-                let $scores := $bulk-search-map($cat)?ranking?scores
-                let $science-idx := $bulk-search-map($cat)?ranking?sciences-idx?($identifier)
-                let $inputs := $bulk-search-map($cat)?ranking?inputs
-            (:
-                        { count( $science-idx ) } configurations :
-                        <table class="table table-bordered table-light table-hover">
-                            <tr><th>FT</th><th>AO</th><th>SCORE</th></tr>9.03 16.381952728829486 4.91 16.883200012527162 31.668749771423702
-                            { for $idx in $science-idx return <tr><td>{$ftaos?*[$idx]?*[1]}</td><td>{$ftaos?*[$idx]?*[2]}</td><td>{$scores?*[$idx]}</td></tr> }
-                        </table>
-                :)
-                let $ordered-science-idx := for $idx in $science-idx order by $scores?*[$idx] descending return $idx
+            for $cat-name in map:keys($bulk-search-map?catalogs)
+                let $cat := $bulk-search-map?catalogs($cat-name)
+                let $ftaos := $cat?ranking?ftaos
+                let $scores := $cat?ranking?scores
+                let $science-idx := $cat?ranking?sciences-idx?($identifier)
+                let $inputs := $cat?ranking?inputs
+                let $ordered-science-idx := for $idx in $science-idx let $score:=$scores?*[$idx] where $score > 0 order by $score descending return $idx
+
             return
                 for $idx at $pos in $ordered-science-idx
-                    where number($scores?*[$idx]) > 0  and $pos <= $max?rank
+                    where $scores?*[$idx] > 0  and $pos <= $max?rank
                     let $ftao := $ftaos?*[$idx]?*
                     return
                         <tr>
@@ -673,17 +668,18 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
                             <td>{$scores?*[$idx]}</td>
                             <td>{$pos}</td>
                             { let $tds := array:flatten($inputs?*[$idx]) return for $c at $pos in $ranking-input-params return <td>{$tds[$pos+1]}</td>}
-                            <td>{$cat}</td>
+                            <td>{$cat-name}</td>
                         </tr>
 
     let $table := <table class="table table-bordered table-light table-hover datatable" id="bulkTable">
         <thead>{$th}</thead>
         {$trs}
         </table>
-    (: Maybe later : let $votable := jmmc-tap:table2votable($table, "targets") :)
+    let $votable := jmmc-tap:table2votable($table, "targets")
 
-    let $error-report := for $cat in $catalogs-to-query
-        let $info := $bulk-search-map($cat)?ranking
+    let $error-report := for $cat in map:keys($bulk-search-map?catalogs)
+        let $cat := $bulk-search-map?catalogs($cat)
+        let $info := $cat?ranking
         let $error := $info?error
         where exists($error)
         return
@@ -702,8 +698,8 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
 
     let $log := util:log("info", "DONE : main table merged")
 
-    let $targets :=<div><h3>{ count($trs) } best proposed configurations for your {count(map:keys($identifiers-map))} targets (top {$max?rank} and non null for each science source { count( $bulk-search-map?*?ranking?scores?*[number(.)>0] ) }/{ count( $bulk-search-map?*?ranking?scores?* ) })
-        <!-- Maybe later : <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="input.vot">votable</a>&#160; -->
+    let $targets :=<div><h3>{ count($trs) } best proposed configurations for your {count(map:keys($identifiers-map))} targets (top {$max?rank} and non null for each science source { count( $bulk-search-map?catalogs?*?ranking?scores?*[number(.)>0] ) }/{ count( $bulk-search-map?catalogs?*?ranking?scores?* ) })
+        <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="input.vot">votable</a>&#160;
         </h3>
         {$error-report}
         {$table}
@@ -712,7 +708,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
             <div class="p-2"><div class="input-group"><span class="input-group-text">Min score:</span><input type="text" id="min_score" name="min_score" value="{$config?min?score}"/></div></div>
             <div class="p-2"><div class="input-group"><span class="input-group-text">Max rank:</span><input type="text" id="max_rank" name="max_rank" value="{$max?rank}"/></div></div>
             <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/aspro.xql">Get my ASPRO2 file 🤩</button></div>
-            <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/test.xql">Test this list</button></div>
+            <!-- <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/test.xql">Test this list</button></div> -->
         </div>
 
     </div>
@@ -725,10 +721,32 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-warning bg-opacity-10 border border-warning border-opacity-10 rounded-2">UT compliancy</small> or
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-danger bg-opacity-10 border border-danger border-opacity-10 rounded-2">not compatible / unknown</small>
         </p>
-        , $bulk-search-map?*?html
+        , $bulk-search-map?catalogs?*?html
         )
 };
 
+(: query given catalogs and perform for rank each ft ao compatible combination
+    output structure is a map :
+    - $res?identifiers-map : map {$identifier : id-info}
+    - $res?catalogs : map{ $catalogName :
+            map {
+                "error" : htmlerror
+                "votable":$votable
+                    or
+                "votable":$votable
+                "html" : $html
+                "targets-map" : map {$identifier : id-info}
+                "ranking : map {
+                    "error": $error
+                    "query" : $query
+                    "sciences-idx" : map { $science-id : array{ $pos-idx } }
+                    "input-params" : array { $colnames }
+                    "inputs" : array { $colvalues_of_colnames }
+                    "ftaos" : array { [ft1, ao1], ... [ftn, aon] }
+                    "scores" : array { $scores }
+                    }
+                }
+:)
 declare function app:searchftt-bulk-list($identifiers as xs:string*, $catalogs-to-query as xs:string* ) {
     let $log := util:log("info", "catalogs to query : " || string-join($catalogs-to-query))
     (: Check that we have requested catalog in our conf :)
@@ -756,13 +774,16 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $catalogs-t
     (: TODO iterate and merge over chunk of
     let $votables := jmmc-tap:table2votable($table, "targets", 500) :)
 
+    let $catalogs := map:merge((
+        for $cat-name in $catalogs-to-query
+            let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
+            let $res  := app:bulk-search($votable, $cat)
+            return map:entry($cat-name,$res)
+        ))
+
     let $bulk-search-map :=  map:merge((
         map:entry("identifiers-map",$identifiers-map),
-        map:entry("catalogs",
-        for $cat-name in $catalogs-to-query
-        let $cat := $app:conf?catalogs?*[?cat_name=$cat-name]
-        let $res  := app:bulk-search($votable, $cat )
-        return map:entry($cat-name,$res))))
+        map:entry("catalogs", $catalogs)))
 
     return
         $bulk-search-map
