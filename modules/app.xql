@@ -608,7 +608,7 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
                 {$cats-params}
             </div>
 
-            <div class="d-flex p-2"><div class="p-2 justify-content-end">Max&#160;constraints:</div>
+            <div class="d-flex p-2"><div class="p-2 justify-content-end">Constraints:</div>
                 {$max-inputs}
             </div>
             <div class="d-flex p-2">
@@ -645,20 +645,22 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
     let $ranking-input-params := (($bulk-search-map?catalogs?*)[1])?ranking?input-params
     let $cols := ($sci-cols,"FT identifier", "AO identifier", "Score", "Rank", $ranking-input-params , "Catalog")
     let $th := <tr> {$cols ! <th>{if(.=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()} {.}</th>}</tr>
-    let $trs :=  for $identifier in map:keys($identifiers-map) order by $identifier
+    let $trs :=  map:merge((
+    for $identifier in map:keys($identifiers-map) order by $identifier
         let $science := map:get($identifiers-map, $identifier)
         return
+            map:entry($identifier,
             for $cat-name in map:keys($bulk-search-map?catalogs)
                 let $cat := $bulk-search-map?catalogs($cat-name)
                 let $ftaos := $cat?ranking?ftaos
                 let $scores := $cat?ranking?scores
                 let $science-idx := $cat?ranking?sciences-idx?($identifier)
                 let $inputs := $cat?ranking?inputs
-                let $ordered-science-idx := for $idx in $science-idx let $score:=$scores?*[$idx] where $score > 0 order by $score descending return $idx
+                let $ordered-science-idx := for $idx in $science-idx let $score:=$scores?*[$idx] where $score > 0  order by $score descending return $idx
 
             return
                 for $idx at $pos in $ordered-science-idx
-                    where $scores?*[$idx] > 0  and $pos <= $max?rank
+                    where $scores?*[$idx] >= 0  and $pos <= $max?rank
                     let $ftao := $ftaos?*[$idx]?*
                     return
                         <tr>
@@ -670,10 +672,11 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
                             { let $tds := array:flatten($inputs?*[$idx]) return for $c at $pos in $ranking-input-params return <td>{$tds[$pos+1]}</td>}
                             <td>{$cat-name}</td>
                         </tr>
+            )))
 
     let $table := <table class="table table-bordered table-light table-hover datatable" id="bulkTable">
         <thead>{$th}</thead>
-        {$trs}
+        {$trs?*}
         </table>
     let $votable := jmmc-tap:table2votable($table, "targets")
 
@@ -698,7 +701,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
 
     let $log := util:log("info", "DONE : main table merged")
 
-    let $targets :=<div><h3>{ count($trs) } best proposed configurations for your {count(map:keys($identifiers-map))} targets (top {$max?rank} and non null for each science source { count( $bulk-search-map?catalogs?*?ranking?scores?*[number(.)>0] ) }/{ count( $bulk-search-map?catalogs?*?ranking?scores?* ) })
+    let $targets :=<div><h3>{ count(map:for-each($trs, function($k,$v){if(exists($v)) then $k else ()})) } targets with both FT and AO solutions
         <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="input.vot">votable</a>&#160;
         </h3>
         {$error-report}
@@ -707,6 +710,8 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
         <div class="p-2 d-flex">
             <div class="p-2"><div class="input-group"><span class="input-group-text">Min score:</span><input type="text" id="min_score" name="min_score" value="{$config?min?score}"/></div></div>
             <div class="p-2"><div class="input-group"><span class="input-group-text">Max rank:</span><input type="text" id="max_rank" name="max_rank" value="{$max?rank}"/></div></div>
+        </div>
+        <div class="p-2 d-flex">
             <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/aspro.xql">Get my ASPRO2 file 🤩</button></div>
             <!-- <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/test.xql">Test this list</button></div> -->
         </div>
@@ -715,7 +720,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
 
     return
         ($targets
-        ,<h2>Results per catalogs.</h2>
+        ,<h2>Detailed raw results from catalogs.</h2>
         ,<p>By now, the ut_flag and at_flag columns are not computed in the votable but the table below ( 1=FT, 2=AO, 3=FT or AO). <br/> Magnitudes columns colors are for
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-success bg-opacity-10 border border-success border-opacity-10 rounded-2">UT and AT compliancy</small>,
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-warning bg-opacity-10 border border-warning border-opacity-10 rounded-2">UT compliancy</small> or
@@ -941,14 +946,19 @@ declare function app:get-ranking($votable, $cat, $max) {
            mag_g_ao mag_g_ft mag_ks_ao mag_ks_ft mag_r_ao mag_r_ft
            mag_v_ao mag_v_ft otype_txt_ao otype_txt_ft pmdec_ao pmdec_ft pmra_ao pmra_ft ra_ao ra_ft science ft_ao_dist_as source_id_ao source_id_ft ut_flag_ao ut_flag_ft
         :)
-        let $input-params := ("mag_ks_ft","cat_dist_as_ft","mag_r_ao","cat_dist_as_ao","ft_ao_dist_as")
+        let $input-params := ("ft_mag","sci__ft_dist","ao_mag","sci_ao_dist","ft_ao_dist")
+
+        (: TODO test if pre process of colidx could speedup array building process :)
         let $inputs := array{
                  for $tr at $pos in $res//*:TR
                     return array{
                         (
-                        0
-                        , for $p in $input-params
-                            return number($tr/*:TD[$colidx($p)])
+                        0,
+                        number($tr/*:TD[$colidx("mag_ks_ft")]),
+                        number($tr/*:TD[$colidx("cat_dist_as_ft")]),
+                        ( for $c in ("mag_g_ao","mag_r_ao","mag_v_ao") let $v := number($tr/*:TD[$colidx($c)]) where $v=$v return $v)[1],
+                        number($tr/*:TD[$colidx("cat_dist_as_ao")]),
+                        number($tr/*:TD[$colidx("ft_ao_dist_as")])
                         )
                     }
             }
