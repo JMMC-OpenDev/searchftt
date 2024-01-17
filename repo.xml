@@ -15,7 +15,8 @@
      <change version="1.5">
       <ul>
         <li>Bulk mode recovers AO or FT targets even if sources do not respond to both constraints.</li>
-        <li>Display ranks and scores computed for every possible SCI,AO,FT combinations. Two fields can filter to best solutions.</li>
+        <li>Define FT and AO constraints for bulk mode.</li>
+        <li>Display ranks and scores computed for every possible SCI,AO,FT combinations with two filter fields to keep the best solutions.</li>
         <li>Export main results table to csv or Aspro2.</li>
         <li>Replace comma separator by semicolon to enter multiple identifiers.</li>
         <li>Refactor bulk mode code to support big catalog queries (~1000 identifiers is fine) in two steps (position followed by magnitudes constraints).</li>

@@ -47,7 +47,7 @@ declare variable $app:json-conf :='{
 
         "max_AO_mag": 12,
         "max_AO_mag_doc": "use Gmag if present in catalogs else Rmag or Vmag",
-        "max_Kmag": 12,
+        "max_FT_mag": 12,
 
         "max_dist_as" : 30,
         "max_declinaison" : 40,
@@ -275,7 +275,7 @@ declare function app:datatable-script($score_index, $rank_index){
                 }}
             }},
             ],
-            "scrollX": true,"scrollY": 600, "scrollResize": true,"scrollCollapse": true,
+            "paging": false,"scrollX": true,"scrollY": 600, "scrollResize": true,"scrollCollapse": true,
             "searching":true,"info": true,"order": [],
             "dom": 'Bfrti',
             "buttons": [ 'colvis','csv','copy'  ]
@@ -497,7 +497,7 @@ declare function app:search($id, $max, $s, $cat) {
                             let $unit :=if (ends-with($f/@name, "_as")) then "[arcsec]" else if(starts-with($f/@name, "computed_")) then "(computed)" else if (data($f/@unit)) then "["|| $f/@unit ||"]" else ()
 
                             return
-                            <th title="{$title}">{if($field_names[$cpos]=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()}{$name} &#160; {$unit}</th>
+                            <th title="{$title}">{if($field_names[$cpos]=$detail_cols) then attribute {"class"} {"extcols"} else ()}{$name} &#160; {$unit}</th>
                         else
                             <th><span class="badge rounded-pill bg-dark">{$tr-count}</span>&#160;Simbad&#160;link&#160;for&#160;<u>{$cat?cat_name}</u></th>
                     }
@@ -523,7 +523,7 @@ declare function app:search($id, $max, $s, $cat) {
                                 (
                                     <td>{$target_link}</td>,
                                     for $td at $cpos in $tr/* where $cpos != 1 return
-                                        element {"td"} {attribute {"class"} {if( $field_names[$cpos]=$detail_cols ) then "d-none extcols table-primary" else ()},try { let $d := xs:double($td) return format-number($d, "0.###") } catch * { if(string-length($td)>1) then data($td) else "-" }},
+                                        element {"td"} {attribute {"class"} {if( $field_names[$cpos]=$detail_cols ) then "extcols" else ()},try { let $d := xs:double($td) return format-number($d, "0.###") } catch * { if(string-length($td)>1) then data($td) else "-" }},
                                     <td>{$getstar-link}<!--{$getstar-votable//*:TABLEDATA/*:TR/*:TD[121]/text()}--></td>
                                 )
                         }</tr>
@@ -565,13 +565,14 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
     (: was here before max-mags to convey mags parameters
         let $params :=  for $p in request:get-parameter-names() where not ( $p=("identifiers", "catalogs") ) return <input type="hidden" name="{$p}" value="{request:get-parameter($p,' ')}"/> :)
 
-    let $max-inputs :=  for $k in ("Kmag","AO_mag", "declinaison") let $v := map:get($max,$k) return
+    let $max-inputs :=  for $k in ("FT_mag","AO_mag", "declinaison") let $v := map:get($max,$k) return
         <div class="p-2"><div class="input-group">
                 <span class="input-group-text">
                 {
                     let $doc := map:get($max, $k||$app:doc-suffix)
+                    let $label := replace($k, "_", "&#160;")
                     return
-                        if(exists($doc))then <a title="{$doc}">{$k}<i class="bi bi-question-circle"></i></a> else $k
+                        if(exists($doc))then <a title="{$doc}">{$label}<i class="bi bi-question-circle"></i></a> else $label
                 }
                 </span>
                 <input name="max_{$k}" value="{$v}" class="form-control"/>
@@ -589,6 +590,7 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
     return
     (
     <div>
+
         <h1>Bulk form for fast and efficient queries !</h1>
         <form method="post" action="bulk.html"> <!-- force action to avoid param duplication on post -->
             <div class="d-flex p-2">
@@ -596,7 +598,7 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
                 <input type="text" class="form-control" placeholder="Enter your science identifiers or coordinates. Use semicolon as separator, e.g : 0 0; 4.321 6.543; HD123; HD234 " aria-label="Science identifiers (semicolon separator)" id="identifiers" name="identifiers" value="{$identifiers}"/>
             </div>
             <!--
-            Disabled waiting for a solution that accept  enctype="multipart/form-data" forms ( without templating ?)
+            Disabled waiting for a solution that accept  enctype="multipart/form-data" forms
             <div class="input-group mb-2">
                 <span class="input-group-text" id="indentifiersFileDesc">... or provide an input file</span>
                 <input type="file" class="form-control" id="indentifiersFile"  name="indentifiersFile" aria-describedby="indentifiersFileDesc" />
@@ -663,7 +665,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
                     let $ftao := $ftaos?*[$idx]?*
                     return
                         <tr>
-                            {for $col in $sci-cols return <td>{if($col=$detail_cols) then attribute {"class"} {"extcols"} else ()}{data($science/*[name(.)=$col])}</td>}
+                            {for $col in $sci-cols return <td>{data($science/*[name(.)=$col])}</td>}
                             <td>{$ftao[1]}</td>
                             <td>{$ftao[2]}</td>
                             <td>{$scores?*[$idx]}</td>
@@ -707,8 +709,9 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
         {$table}
 
         <div class="p-2 d-flex">
-            <div class="p-2"><div class="input-group"><span class="input-group-text">Min score:</span><input type="text" id="min_score" name="min_score" value="{$config?min?score}"/></div></div>
-            <div class="p-2"><div class="input-group"><span class="input-group-text">Max rank:</span><input type="text" id="max_rank" name="max_rank" value="{$max?rank}"/></div></div>
+            <div class="p-2 justify-content-end">Limit to :</div>
+            <div class="p-2"><div class="input-group"><span class="input-group-text" title="1= best perfo, 0= worst perfo">Min score of solutions <i class="bi bi-question-circle"></i></span><input type="text" id="min_score" name="min_score" value="{$config?min?score}"/></div></div>
+            <div class="p-2"><div class="input-group"><span class="input-group-text" title="this is the rank">Max number solutions per science <i class="bi bi-question-circle"></i></span><input type="text" id="max_rank" name="max_rank" value="{$max?rank}"/></div></div>
         </div>
         <div class="p-2 d-flex">
             <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/aspro.xql">Get my ASPRO2 file 🤩</button></div>
@@ -719,6 +722,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
 
     return
         ($targets
+        ,<br/>,<hr/>,<span>Next content still need refactoring...</span>,<hr/>,<br/>
         ,<h2>Detailed raw results from catalogs.</h2>
         ,<p>By now, the ut_flag and at_flag columns are not computed in the votable but the table below ( 1=FT, 2=AO, 3=FT or AO). <br/> Magnitudes columns colors are for
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-success bg-opacity-10 border border-success border-opacity-10 rounded-2">UT and AT compliancy</small>,
@@ -841,7 +845,7 @@ declare function app:bulk-search($input-votable, $cat) {
                 </div>
             )
         else
-            let $detail_cols := for $e in (array:flatten($app:conf?extended-cols)) return lower-case($e)
+            let $detail_cols := for $e in (array:flatten($app:conf?extended-cols), $cat?detail?* ) return lower-case($e)
             let $detail_fields_pos := for $e at $pos in $votable//*:FIELD/@name return if(lower-case($e)=$detail_cols) then $pos else ()
 
             let $field_names := for $e in $votable//*:FIELD/@name return lower-case($e)
@@ -869,8 +873,13 @@ declare function app:bulk-search($input-votable, $cat) {
                     </h3>
 
                     <table class="table table-light table-bordered table-hover datatable exttable">
-                        <thead><tr>{for $field in $votable//*:FIELD return <th title="{$field/*:DESCRIPTION}">{if($field/@name=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()}{data($field/@name)}</th>}<th title="number of stars returned for the same science target">commons</th></tr></thead>
-                        {
+                        <thead><tr>
+                            {for $field at $pos in $votable//*:FIELD
+                                return
+                                    <th title="{$field/*:DESCRIPTION}">{if($pos=$detail_fields_pos) then attribute {"class"} {"nnnextcols"} else ()}{data($field/@name)}</th>}
+                            <th title="number of stars returned for the same science target">commons</th>
+                        </tr></thead>
+                        <tbody>{
                             for $src_tr in subsequence($trs,1,$max?result_table_rows) group by $science := $src_tr/*:TD[$science_idx]
                             let $group_size := count($src_tr)
                             return for $tr in $src_tr
@@ -893,7 +902,7 @@ declare function app:bulk-search($input-votable, $cat) {
 
                             return <tr>
                                     {for $td at $pos in $tr/*:TD
-                                    return <td>{if($pos=$detail_fields_pos) then attribute {"class"} {"d-none extcols table-primary"} else ()}{
+                                    return <td>{
                                         switch($pos)
                                             case $source_id_idx return $target_link
                                             case $mag_k_idx return
@@ -910,7 +919,7 @@ declare function app:bulk-search($input-votable, $cat) {
                                     }</td>}
                                     <td>{$group_size}</td>
                                 </tr>
-                        }
+                        }</tbody>
                     </table>
                     {$query-code}
                     {<code class="extdebug d-none"><br/>Catalog query duration : {seconds-from-duration(util:system-time()-$start-time)}s</code>}
@@ -987,7 +996,7 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
     let $vmag := $cat?mag_v
     let $rmag := $cat?mag_r
     let $computed_prefix := if($vmag and $rmag ) then () else "computed_"
-    let $ft-filters := <text>(ft.mag_ks &lt; {$max?Kmag})</text>
+    let $ft-filters := <text>(ft.mag_ks &lt; {$max?FT_mag})</text>
     let $ao-filters := <text>(ao.mag_g&lt;{$max?AO_mag}) OR (ao.{$computed_prefix}mag_r&lt;{$max?AO_mag}) OR (ao.{$computed_prefix}mag_v&lt;{$max?AO_mag})</text>
 
     let $ftao-dist := <text>DISTANCE( POINT( 'ICRS', ft.ra, ft.dec),POINT('ICRS', ao.ra, ao.dec))*3600.0</text>
@@ -1014,7 +1023,7 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
 
 (: A votable is given in bulk mode.
     bulk query are not the same as the individual one.
-    limits are not the same bulk uses max.Kmag and max.AO_mag (on G R V)
+    limits are not the same bulk uses max.FT_mag and max.AO_mag (on G R V)
 
 :)
 declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
@@ -1065,7 +1074,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $v_filter := if ($vmag) then $vmag else <text>( {$cat?mag_g } - ( -0.0176 - 0.00686* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1732*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
     let $r_filter := if ($rmag) then $rmag else <text>( {$cat?mag_g } - ( 0.003226 + 0.3833* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1345*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
     let $max-mag-filters := if($votname)
-        then <text>({$cat?mag_k }&lt;{$max?Kmag} OR {$v_filter}&lt;{$max?AO_mag} OR {$r_filter}&lt;{$max?AO_mag} OR {$cat?mag_g}&lt;{$max?AO_mag})</text>
+        then <text>({$cat?mag_k }&lt;{$max?FT_mag} OR {$v_filter}&lt;{$max?AO_mag} OR {$r_filter}&lt;{$max?AO_mag} OR {$cat?mag_g}&lt;{$max?AO_mag})</text>
         else <text>( ({$cat?mag_k }&lt;{$max?magK_UT} AND {$v_filter}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} AND {$r_filter}&lt;{$max?magR}) )</text>
 
     (: escape catalogs with / inside  (VizieR case):)
