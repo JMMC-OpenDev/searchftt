@@ -56,11 +56,11 @@ declare variable $app:json-conf :='{
         "max_rank" : 20,
         "max_rankbulk_doc" : "max number of best AOFT tuples sorted by score",
 
-        "min_score" : 0.01,
+        "min_score" : 0.0,
 
         "preferred_bulk_catalog" : "Gaia DR3"
     },
-    "extended-cols" : [ "pmra", "pmdec", "pmde", "epoch", "cat_dist_as", "today_dist_as", "id", "str_source_id" ],
+    "extended-cols" : [ "pmra", "pmdec", "pmde", "epoch", "cat_dist_as", "today_dist_as", "id", "str_source_id", "name" ],
     "samestar-dist_deg" : 2.78E-4,
     "samestar-dist_as" : 1,
     "catalogs":{
@@ -219,7 +219,7 @@ declare function app:config() as map(*){
 };
 
 declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*), $identifiers as xs:string*) {
-    let $toggle-classes := map{ "extcats" : "extended catalogs", "extcols" : "extended columns", "extquery" : "queries", "exttable" : "hide tables", "extorphan" : "hide orphans", "extdebug" : "debug" }
+    let $toggle-classes := map{ "extcats" : "extended catalogs", "extquery" : "queries", "exttable" : "hide tables", "extorphan" : "hide orphans", "extdebug" : "debug" }
     return
         <li class="nav-link">{
             map:for-each( $toggle-classes, function ($k, $label) {
@@ -230,7 +230,7 @@ declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*
         }</li>[exists($identifiers)]
 };
 
-declare function app:datatable-script(){
+declare function app:datatable-script($score_index, $rank_index){
     (: TODO try to avoid hardcoded indexes for datacolumns :)
     <script type="text/javascript">
         var formatTable = true; // TODO enhance table metadata so we rely on it and limit formating on some columns
@@ -247,10 +247,10 @@ declare function app:datatable-script(){
             }}
 
             let min_s = parseFloat(min_score.value, 10) || 0;
-            let s = parseFloat(data[9],10) || 0;
+            let s = parseFloat(data[{$score_index - 1}],10) || 0;
 
             let max_r = parseInt(max_rank.value) || 100;
-            let r = parseInt(data[10]) || 100;
+            let r = parseInt(data[{$rank_index - 1}]) || 100;
 
             if ( ( r &lt;= max_r ) &amp;&amp; ( s &gt;= min_s ) ) {{
                 return true;
@@ -275,19 +275,18 @@ declare function app:datatable-script(){
                 }}
             }},
             ],
-            "paging": false,"scrollX": true,"scrollY": 600, "scrollResize": true,"scrollCollapse": true,
+            "scrollX": true,"scrollY": 600, "scrollResize": true,"scrollCollapse": true,
             "searching":true,"info": true,"order": [],
-            "dom": 'Bfrtip',
-            "buttons": ['pageLength', 'colvis','csv','copy'  ],
-            "lengthMenu": [
-                [10, 25, 50, 100, -1],
-                [10, 25, 50, 100, "All"]],
-            "iDisplayLength": 25
-        }});
+            "dom": 'Bfrti',
+            "buttons": [ 'colvis','csv','copy'  ]
+            }});
 
         // Changes to the inputs will trigger a redraw to update the table
         min_score.addEventListener('input', function () {{ tables.draw(); }});
         max_rank.addEventListener('input', function () {{ tables.draw(); }});
+
+        // Hide extcols by default
+        tables.columns( '.extcols' ).visible( false );
 
         }});
     </script>
@@ -333,7 +332,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
         </form>
     </div>
     ,
-    if (exists($identifiers)) then ( app:searchftt-list($identifiers, $max), app:datatable-script() ) else ()
+    if (exists($identifiers)) then ( app:searchftt-list($identifiers, $max), app:datatable-script(0,0) ) else ()
     )
 };
 
@@ -620,7 +619,6 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
                 if (exists($identifiers[string-length()>0])) then
                     (
                         app:searchftt-bulk-list-html($identifiers, $max, $catalogs),
-                        app:datatable-script(),
                         <p><i class="bi bi-info-circle-fill"></i>&#160;<kbd>Shift</kbd> click in the column order buttons to combine a multi column sorting.</p>
                     )
                 else ()
@@ -644,7 +642,8 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
     let $sci-cols :=  $identifiers-map?*[1]/* ! name(.)
     let $ranking-input-params := (($bulk-search-map?catalogs?*)[1])?ranking?input-params
     let $cols := ($sci-cols,"FT identifier", "AO identifier", "Score", "Rank", $ranking-input-params , "Catalog")
-    let $th := <tr> {$cols ! <th>{if(.=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()} {.}</th>}</tr>
+    let $th := <tr> {$cols ! <th>{if(.=$detail_cols) then attribute {"class"} {"extcols"} else ()} {.}</th>}</tr>
+
     let $trs :=  map:merge((
     for $identifier in map:keys($identifiers-map) order by $identifier
         let $science := map:get($identifiers-map, $identifier)
@@ -664,7 +663,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
                     let $ftao := $ftaos?*[$idx]?*
                     return
                         <tr>
-                            {for $col in $sci-cols return <td>{if($col=$detail_cols) then attribute {"class"} {"d-none extcols table-primary"} else ()}{data($science/*[name(.)=$col])}</td> }
+                            {for $col in $sci-cols return <td>{if($col=$detail_cols) then attribute {"class"} {"extcols"} else ()}{data($science/*[name(.)=$col])}</td>}
                             <td>{$ftao[1]}</td>
                             <td>{$ftao[2]}</td>
                             <td>{$scores?*[$idx]}</td>
@@ -727,6 +726,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-danger bg-opacity-10 border border-danger border-opacity-10 rounded-2">not compatible / unknown</small>
         </p>
         , $bulk-search-map?catalogs?*?html
+        ,app:datatable-script(index-of($cols, "Score"),index-of($cols, "Rank"))
         )
 };
 
