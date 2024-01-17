@@ -15,57 +15,41 @@ let $catalogs := request:get-parameter("catalogs",())
 (: compute lists :)
 let $res := app:searchftt-bulk-list($identifiers, $catalogs)
 
-(: TODO filter by min_score and ranking :)
+(: gather results :)
 let $sciences-idx := $res?catalogs?*?ranking?sciences-idx
 let $sciences := distinct-values(for $m in $sciences-idx return map:keys($m))
 
-(:let $ftaos := $res?catalogs?*?ranking?ftaos:)
-let $ftaos := array{
-    for $ranking in $res?catalogs?*?ranking
-    let $scores := $ranking?scores
-    return
-        for $ftao at $pos in $ranking?ftaos?*
-        let $ftao-score := $scores?*[position()=$pos]
-        where  $ftao-score > $config?min?score
-        return $ftao
-}
-
-let $fts-ids  := for $ftao in $ftaos?* group by $ft := $ftao?*[1] return $ft
-let $aos-ids  := for $ftao in $ftaos?* group by $ao := $ftao?*[2] return $ao
-
-let $all-identifiers := distinct-values( ( $sciences, $fts-ids, $aos-ids) )
-let $targets-map := map:merge(($res?catalogs?*?targets-map, $res?identifiers-map)) (: last given map has the highest priority in this implementation :)
-
-let $targetInfos :=
+let $targetInfos := map:merge((
     for $science in distinct-values($sciences)
         let $all-ftaos := array{ for $ranking in $res?catalogs?*?ranking
             let $science-idx := $ranking?sciences-idx($science)
-            let $science-scores := $ranking?scores[position()=$science-idx]
+            let $scores := $ranking?scores?*
+            let $science-idx := for $idx in $science-idx let $score:=$scores[$idx] let $log := util:log("info", "score["|| $idx ||"]="||$score )  where $score >= $config?min?score  order by $score descending let $log := util:log("info", "score OK" )  return $idx
 
-            let $science-ftaos := for $ftao at $pos in $ranking?ftaos?*[position()=$science-idx]
-                let $ftao-score := $science-scores?*[position()=$pos]
-                where  $ftao-score > $config?min?score
-                order by $ftao-score
+            let $science-ftaos :=
+                for $idx at $pos in $science-idx
+                let $ftao := $ranking?ftaos?*[position()=$idx]
+
+                where  $pos <= $config?max?rank
                 return $ftao
 
             return $science-ftaos
         }
+        (: limit science object with the one that have a solution :)
+        where count($all-ftaos?*)>0
         (: get distinct fts and aos :)
         let $science-fts  := for $ftao in $all-ftaos?* group by $ft := $ftao?*[1] return $ft
         let $science-aos  := for $ftao in $all-ftaos?* group by $ao := $ftao?*[2] return $ao
-
         return
-            <targetInfo>
-                <targetRef>{app:genTargetIds($science)}</targetRef>
-                <groupMembers>
-                    <groupRef>JMMC_AO</groupRef>
-                    <targets>{string-join(app:genTargetIds($science-aos), " ")}</targets>
-                </groupMembers>
-                <groupMembers>
-                    <groupRef>JMMC_FT</groupRef>
-                    <targets>{string-join(app:genTargetIds($science-fts), " ")}</targets>
-                </groupMembers>
-            </targetInfo>
+            map:entry($science, map{ "ft-ids": $science-fts, "ao-ids": $science-aos})
+    ))
+
+let $fts-ids := $targetInfos?*?ft-ids
+let $aos-ids := $targetInfos?*?ao-ids
+
+(: prepare maps for Aspro2 sources description :)
+let $all-identifiers := distinct-values( ( map:keys($targetInfos), $fts-ids, $aos-ids) )
+let $targets-map := map:merge(($res?catalogs?*?targets-map, $res?identifiers-map)) (: last given map has the highest priority in this implementation :)
 
 return
 
@@ -165,7 +149,23 @@ return
             <targets>{ string-join(app:genTargetIds($fts-ids), " ") }</targets>
         </groupMembers>
         {
-            $targetInfos
+            map:for-each($targetInfos, function ($science,$science-map){
+                let $science-fts:=$science-map?ft-ids
+                let $science-aos:=$science-map?ao-ids
+                return
+                    <targetInfo>
+                        <targetRef>{app:genTargetIds($science)}</targetRef>
+                        <groupMembers>
+                            <groupRef>JMMC_AO</groupRef>
+                            <targets>{string-join(app:genTargetIds($science-aos), " ")}</targets>
+                        </groupMembers>
+                        <groupMembers>
+                            <groupRef>JMMC_FT</groupRef>
+                            <targets>{string-join(app:genTargetIds($science-fts), " ")}</targets>
+                        </groupMembers>
+                    </targetInfo>
+            })
+
         }
 
     </targetUserInfos>
