@@ -590,8 +590,15 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
     return
     (
     <div>
-
-        <h1>Bulk form for fast and efficient queries !</h1>
+<h1>SearchFFT: off-axis Fringe Tracking and Adaptative Optics for interferometry</h1>
+<p>This tool searches for nearby stars suitable for off-axis Fringe Tracking and off-axis Adaptive Optics.
+<br/>
+You can query one or several Science Targets separated by semicolon by names (resolved using Simbad) or by coordinates (RA +/-DEC in degrees J2000). For each of them, suitable solutions will be searched. When several solutions are found, a scoring is proposed based on a simplified model of AO (GPAO) and FT (GRAVITY) of VLTI. If the Science Target allows it, the on-axis solution(s) are also presented and ranked.
+<br/>
+For the time being, only the NGS mode of GPAO is supported by the scoring. However, solutions can be found for the LGS mode by increasing the AO magnitude (but with wrong scoring and ranking).
+<br/>
+SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers. Each query is performed within a search radius of the Science Target below a max declinaison. A magnitude filter is applied on candidates for the FT (infrared) and for the AO (visible)
+</p>
         <form method="post" action="bulk.html"> <!-- force action to avoid param duplication on post -->
             <div class="d-flex p-2">
             <div class="input-group">
