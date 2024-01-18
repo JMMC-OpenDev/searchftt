@@ -24,7 +24,7 @@ let $targetInfos := map:merge((
         let $all-ftaos := array{ for $ranking in $res?catalogs?*?ranking
             let $science-idx := $ranking?sciences-idx($science)
             let $scores := $ranking?scores?*
-            let $science-idx := for $idx in $science-idx let $score:=$scores[$idx] let $log := util:log("info", "score["|| $idx ||"]="||$score )  where $score >= $config?min?score  order by $score descending let $log := util:log("info", "score OK" )  return $idx
+            let $science-idx := for $idx in $science-idx let $score:=$scores[$idx] where $score >= $config?min?score  order by $score descending return $idx
 
             let $science-ftaos :=
                 for $idx at $pos in $science-idx
