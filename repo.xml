@@ -4,7 +4,7 @@
   <description>Search Fringe Tracking Targets</description>
   <author>JMMC Tech Group</author>
   <website>https://www.jmmc.fr</website>
-  <status>stable</status><!-- stable/beta/alpha -->
+  <status>alpha</status><!-- stable/beta/alpha -->
   <license>AGPL-3.0</license>
   <copyright>true</copyright>
   <type>application</type>
@@ -12,7 +12,7 @@
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
   <changelog xmlns="">
-     <change version="1.5">
+     <change version="1.5.6">
       <ul>
         <li>Bulk mode recovers AO or FT targets even if sources do not respond to both constraints.</li>
         <li>Define FT and AO constraints for bulk mode.</li>
