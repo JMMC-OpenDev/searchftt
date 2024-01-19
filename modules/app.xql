@@ -289,6 +289,8 @@ declare function app:datatable-script($score_index, $rank_index){
         // Hide extcols by default
         tables.columns( '.extcols' ).visible( false );
 
+        // Set search input and buttons on the same line
+        tables.buttons().container().appendTo( '.dataTables_filter' );
         }});
     </script>
 };
