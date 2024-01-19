@@ -12,7 +12,7 @@
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
   <changelog xmlns="">
-     <change version="1.5.7">
+     <change version="1.5.8">
       <ul>
         <li>Bulk mode recovers AO or FT targets even if sources do not respond to both constraints.</li>
         <li>Define FT and AO constraints for bulk mode.</li>
