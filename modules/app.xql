@@ -53,7 +53,7 @@ declare variable $app:json-conf :='{
         "max_declinaison" : 40,
         "max_rec" : 25,
         "max_result_table_rows" : 1000,
-        "max_rank" : 20,
+        "max_rank" : 4,
         "max_rankbulk_doc" : "max number of best AOFT tuples sorted by score",
 
         "min_score" : 0.0,
@@ -595,11 +595,11 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
 <h1>SearchFFT: off-axis Fringe Tracking and Adaptative Optics for interferometry</h1>
 <p>This tool searches for nearby stars suitable for off-axis Fringe Tracking and off-axis Adaptive Optics.
 <br/>
-You can query one or several Science Targets separated by semicolon by names (resolved using Simbad) or by coordinates (RA +/-DEC in degrees J2000). For each of them, suitable solutions will be searched. When several solutions are found, a scoring is proposed based on a simplified model of AO (GPAO) and FT (GRAVITY) of VLTI. If the Science Target allows it, the on-axis solution(s) are also presented and ranked.
+You can query one or several Science Targets separated by semicolon by names (resolved using Simbad) or by coordinates (RA +/-DEC in degrees J2000). For each of them, suitable solutions will be searched. Only solutions with a valid AO and a valid FT are presented. When several solutions are found, a scoring and ranking is proposed based on a simplified model of AO (GPAO) and FT (GRAVITY) of VLTI. If the Science Target allows it, the on-axis solution is also presented and ranked.
 <br/>
 For the time being, only the NGS mode of GPAO is supported by the scoring. However, solutions can be found for the LGS mode by increasing the AO magnitude (but with wrong scoring and ranking).
 <br/>
-SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers. Each query is performed within a search radius of the Science Target below a max declinaison. A magnitude filter is applied on candidates for the FT (infrared) and for the AO (visible)
+SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers. Each query is performed within a search radius around the Science Target below a max declinaison. A magnitude filter is applied to define candidates for the FT (infrared) and for the AO (visible). Only solutions with a valid AO and a valid FT are presented in the main output table. For debug or further investigations, the list of all individual candidates can be found in the extended raw result.
 </p>
         <form method="post" action="bulk.html"> <!-- force action to avoid param duplication on post -->
             <div class="d-flex p-2">
@@ -1011,7 +1011,7 @@ declare function app:get-ranking($votable, $cat, $max) {
            mag_g_ao mag_g_ft mag_ks_ao mag_ks_ft mag_r_ao mag_r_ft
            mag_v_ao mag_v_ft otype_txt_ao otype_txt_ft pmdec_ao pmdec_ft pmra_ao pmra_ft ra_ao ra_ft science ft_ao_dist_as source_id_ao source_id_ft ut_flag_ao ut_flag_ft
         :)
-        let $input-params := ("ft_mag","sci__ft_dist","ao_mag","sci_ao_dist","ft_ao_dist")
+        let $input-params := ("ft_mag","sci_ft_dist","ao_mag","sci_ao_dist","ft_ao_dist")
 
         (: TODO test if pre process of colidx could speedup array building process :)
         let $inputs := array{
