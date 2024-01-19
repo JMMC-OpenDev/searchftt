@@ -640,7 +640,7 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
                 <div class="col-sm-2"><a href="bulk.html" class="btn btn-outline-secondary" role="button"> Reset <i class="bi bi-arrow-clockwise"></i></a></div>
                 {
                     if (exists($identifiers[string-length()>0]) )  then () else (
-                    <div class="col-sm-2"><button type="submit" class="btn btn-primary" formenctype="multipart/form-data" formaction="modules/test.xql" title="You may submit an input file with one id or coordinate (RA +/-DEC in degrees J2000) per line ">Submit my file<i class="bi bi-question-circle"></i></button></div>,
+                    <div class="col-sm-2"><button type="submit" class="btn btn-primary" formenctype="multipart/form-data" formaction="modules/inputfile.xql" title="You may submit an input file with one id or coordinate (RA +/-DEC in degrees J2000) per line ">Submit my file<i class="bi bi-question-circle"></i></button></div>,
                     <div class="col-sm-2"><input type="file" class="btn btn-primary" name="inputfile"/></div>
                     )
                 }
