@@ -231,7 +231,7 @@ declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*
         }</li>[exists($identifiers)]
 };
 
-declare function app:datatable-script($score_index, $rank_index){
+declare function app:datatable-script($score_index, $rank_index, $sci_ft_dist_index, $sci_ao_dist_index){
     (: TODO try to avoid hardcoded indexes for datacolumns :)
     <script type="text/javascript">
         var formatTable = true; // TODO enhance table metadata so we rely on it and limit formating on some columns
@@ -275,6 +275,23 @@ declare function app:datatable-script($score_index, $rank_index){
                     return data;
                 }}
             }},
+            {{
+                "targets": {$score_index - 1},
+                "createdCell": function (td, cellData, rowData, row, col) {{
+                    if ( $(this)[0].id == 'bulkTable' ) {{
+                        $(td).css('background-color', `rgb(${{(1 - cellData) *256}}, ${{cellData*256}},0)`);
+                    }}
+                }}
+            }},
+            {{
+                "targets": [ {$sci_ft_dist_index - 1 },{$sci_ao_dist_index - 1 } ],
+                "createdCell": function (td, cellData, rowData, row, col) {{
+                    if ( $(this)[0].id == 'bulkTable' ) {{
+                        $l = cellData * 8.5 ;
+                        $(td).css('background-color', `rgb(${{$l}}, ${{256.0 -$l}},0)`);
+                    }}
+                }}
+            }}
             ],
             "paging": false,"scrollX": true,"scrollY": 600, "scrollResize": true,"scrollCollapse": true,
             "searching":true,"info": true,"order": [],
@@ -290,7 +307,8 @@ declare function app:datatable-script($score_index, $rank_index){
         tables.columns( '.extcols' ).visible( false );
 
         // Set search input and buttons on the same line
-        tables.buttons().container().appendTo( '.dataTables_filter' );
+        // bugged tables.buttons().container().appendTo( '.dataTables_filter' );
+
         }});
     </script>
 };
@@ -335,7 +353,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
         </form>
     </div>
     ,
-    if (exists($identifiers)) then ( app:searchftt-list($identifiers, $max), app:datatable-script(0,0) ) else ()
+    if (exists($identifiers)) then ( app:searchftt-list($identifiers, $max), app:datatable-script(0,0,0,0) ) else ()
     )
 };
 
@@ -667,7 +685,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
     let $trs :=  map:merge((
     for $identifier at $identifier-pos in map:keys($identifiers-map) order by $identifier
         let $science := map:get($identifiers-map, $identifier)
-        let $opacity := 100 - 50 * ($identifier-pos mod 2)
+        (: let $opacity := 100 - 50 * ($identifier-pos mod 2) :)
         return
             map:entry($identifier,
             for $cat-name in map:keys($bulk-search-map?catalogs)
@@ -692,7 +710,8 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
                         where $ordered-science-scores[$pos] >= $config?min?score and $pos <= $max?rank
                         let $ftao := $ftaos?*[$idx]?*
                         return
-                            <tr class="opacity-{$opacity}">
+                            (: <tr class="opacity-{$opacity}"> :)
+                            <tr>
                                 {for $col in $sci-cols return <td>{data($science/*[name(.)=$col])}</td>}
                                 <td>{$ftao[1]}</td>
                                 <td>{$ftao[2]}</td>
@@ -766,7 +785,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-danger bg-opacity-10 border border-danger border-opacity-10 rounded-2">not compatible / unknown</small>
         </p>
         , $bulk-search-map?catalogs?*?html
-        ,app:datatable-script(index-of($cols, "Score"),index-of($cols, "Rank"))
+        ,app:datatable-script(index-of($cols, "Score"),index-of($cols, "Rank"),index-of($cols, "sci_ft_dist"),index-of($cols, "sci_ao_dist"))
         )
 };
 
