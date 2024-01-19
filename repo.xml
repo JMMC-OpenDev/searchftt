@@ -4,7 +4,7 @@
   <description>Search Fringe Tracking Targets</description>
   <author>JMMC Tech Group</author>
   <website>https://www.jmmc.fr</website>
-  <status>alpha</status><!-- stable/beta/alpha -->
+  <status>beta</status><!-- stable/beta/alpha -->
   <license>AGPL-3.0</license>
   <copyright>true</copyright>
   <type>application</type>
@@ -12,13 +12,13 @@
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
   <changelog xmlns="">
-     <change version="1.5.6">
+     <change version="1.5.7">
       <ul>
         <li>Bulk mode recovers AO or FT targets even if sources do not respond to both constraints.</li>
         <li>Define FT and AO constraints for bulk mode.</li>
         <li>Display ranks and scores computed for every possible SCI,AO,FT combinations with two filter fields to keep the best solutions.</li>
         <li>Export main results table to csv or Aspro2.</li>
-        <li>Replace comma separator by semicolon to enter multiple identifiers.</li>
+        <li>Use semicolon to enter multiple identifiers (was comma) and support to upload the list using a one column file.</li>
         <li>Refactor bulk mode code to support big catalog queries (~1000 identifiers is fine - more may come) in two steps (position followed by magnitudes constraints).</li>
         <li>Resolve names and coordinates in batch mode for huge speedup on long target lists.</li>
         <li>Format decimal values (3 digits) in result tables.</li>

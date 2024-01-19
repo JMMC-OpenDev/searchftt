@@ -560,6 +560,7 @@ declare function app:get-identifiers-from-file($indentifiersFile as xs:string*){
 
 declare %templates:wrap function app:bulk-form($node as node(), $model as map(*), $identifiers as xs:string*, $catalogs as xs:string*) {
     app:bulk-form-html($identifiers, $catalogs)
+    ,session:clear()
 };
 
 declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:string*) {
@@ -608,13 +609,6 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
             <div class="input-group">
                 <input type="text" class="form-control" placeholder="Enter your science identifiers or coordinates. Use semicolon as separator, e.g : 0 0; 4.321 6.543; HD123; HD234 " aria-label="Science identifiers (semicolon separator)" id="identifiers" name="identifiers" value="{$identifiers}"/>
             </div>
-            <!--
-            Disabled waiting for a solution that accept  enctype="multipart/form-data" forms
-            <div class="input-group mb-2">
-                <span class="input-group-text" id="indentifiersFileDesc">... or provide an input file</span>
-                <input type="file" class="form-control" id="indentifiersFile"  name="indentifiersFile" aria-describedby="indentifiersFileDesc" />
-            </div>
-            -->
             </div>
             <div class="d-flex p-2"><div class="p-2 justify-content-end"><label class="form-check-label ">Catalogs to query:</label></div>
                 {$cats-params}
@@ -624,8 +618,14 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
                 {$max-inputs}
             </div>
             <div class="d-flex p-2">
-                <div class="col-sm-2"><input type="submit" class="btn btn-primary"/></div>
+                <div class="col-sm-2"><input type="submit" class="btn btn-primary" value="Submit my identifiers"/></div>
                 <div class="col-sm-2"><a href="bulk.html" class="btn btn-outline-secondary" role="button"> Reset <i class="bi bi-arrow-clockwise"></i></a></div>
+                {
+                    if (exists($identifiers[string-length()>0]) )  then () else (
+                    <div class="col-sm-2"><button type="submit" class="btn btn-primary" formenctype="multipart/form-data" formaction="modules/test.xql" title="You may submit an input file with one id or coordinate (RA +/-DEC in degrees J2000) per line ">Submit my file<i class="bi bi-question-circle"></i></button></div>,
+                    <div class="col-sm-2"><input type="file" class="btn btn-primary" name="inputfile"/></div>
+                    )
+                }
             </div>
 
             {
