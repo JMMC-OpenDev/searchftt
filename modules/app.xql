@@ -665,8 +665,9 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
     ))
 
     let $trs :=  map:merge((
-    for $identifier in map:keys($identifiers-map) order by $identifier
+    for $identifier at $identifier-pos in map:keys($identifiers-map) order by $identifier
         let $science := map:get($identifiers-map, $identifier)
+        let $opacity := 100 - 50 * ($identifier-pos mod 2)
         return
             map:entry($identifier,
             for $cat-name in map:keys($bulk-search-map?catalogs)
@@ -691,7 +692,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
                         where $ordered-science-scores[$pos] >= $config?min?score and $pos <= $max?rank
                         let $ftao := $ftaos?*[$idx]?*
                         return
-                            <tr>
+                            <tr class="opacity-{$opacity}">
                                 {for $col in $sci-cols return <td>{data($science/*[name(.)=$col])}</td>}
                                 <td>{$ftao[1]}</td>
                                 <td>{$ftao[2]}</td>
