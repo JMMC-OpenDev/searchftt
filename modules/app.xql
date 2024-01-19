@@ -578,7 +578,7 @@ declare function app:get-identifiers-from-file($indentifiersFile as xs:string*){
 
 declare %templates:wrap function app:bulk-form($node as node(), $model as map(*), $identifiers as xs:string*, $catalogs as xs:string*) {
     app:bulk-form-html($identifiers, $catalogs)
-    ,session:clear()
+    ,try{ session:clear() }catch *{ () }
 };
 
 declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:string*) {
