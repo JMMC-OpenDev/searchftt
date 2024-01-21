@@ -683,6 +683,15 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
     )
 };
 
+declare function app:simbad-link($id as xs:string, $target, $ra as xs:string?, $dec as xs:string?){
+    if (exists($target/ra/text())) then
+        <a title="{$target/user_identifier}" href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}">{replace($target/name," ","&#160;")}</a>
+    else if (exists($ra) and exists($dec) ) then
+        <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$id}">{replace($id," ","&#160;")}</a>
+    else
+        $target/user_identifier/text()
+};
+
 declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max as map(*), $catalogs-to-query as xs:string* ) {
     let $config := app:config()
     let $bulk-search-map := app:searchftt-bulk-list($identifiers, $catalogs-to-query)
@@ -712,6 +721,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
             map:entry($identifier,
             for $cat-name in map:keys($bulk-search-map?catalogs)
                 let $cat := $bulk-search-map?catalogs($cat-name)
+                let $targets-map := $cat?targets-map
                 let $ranking := $cat?ranking
                 let $ftaos := $cat?ranking?ftaos
                 let $scores := $cat?ranking?scores
@@ -735,8 +745,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
                             (: <tr class="opacity-{$opacity}"> :)
                             <tr>
                                 {for $col in $sci-cols return <td>{data($science/*[name(.)=$col])}</td>}
-                                <td>{$ftao[1]}</td>
-                                <td>{$ftao[2]}</td>
+                                {for $id in $ftao return <td>{app:simbad-link($id, $targets-map($id),(),())}</td>}
                                 <td>{$scores?*[$idx]}</td>
                                 <td>{$pos}</td>
                                 { let $tds := array:flatten($inputs?*[$idx]) return for $c at $pos in $ranking-input-params return <td>{$tds[$pos+1]}</td>}
@@ -996,10 +1005,7 @@ declare function app:bulk-search($identifiers-map, $cat) {
                             return for $tr in $src_tr
                             let $simbad_id := $cat?simbad_prefix_id||$tr/*[$source_id_idx]
                             let $simbad := map:get($targets-maps, $simbad_id)
-                            let $target_link := if (exists($simbad/ra/text())) then <a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($simbad_id)}">{replace($simbad/name," ","&#160;")}</a> else
-                                        let $ra := $tr/*[index-of($field_names, "ra")]
-                                        let $dec := $tr/*[index-of($field_names, "dec")]
-                                        return <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$simbad_id}">{replace($simbad_id," ","&#160;")}</a>
+                            let $target_link := app:simbad-link($simbad_id, $simbad,$tr/*[index-of($field_names, "ra")],$tr/*[index-of($field_names, "dec")])
                             (: Compute flags :)
                             let $magk := number($tr/*[$mag_k_idx])
                             (: AT :)
