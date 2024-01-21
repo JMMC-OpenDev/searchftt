@@ -4,7 +4,7 @@
   <description>Search Fringe Tracking Targets</description>
   <author>JMMC Tech Group</author>
   <website>https://www.jmmc.fr</website>
-  <status>beta</status><!-- stable/beta/alpha -->
+  <status>stable</status><!-- stable/beta/alpha -->
   <license>AGPL-3.0</license>
   <copyright>true</copyright>
   <type>application</type>
@@ -12,8 +12,9 @@
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
   <changelog xmlns="">
-     <change version="1.5.9">
+     <change version="1.5.10">
       <ul>
+        <li>Move bulk form as default. Old one is <a href="onebyone.html">still online for some next releases</a>.</li>
         <li>Bulk mode recovers AO or FT targets even if sources do not respond to both constraints.</li>
         <li>Define FT and AO constraints for bulk mode.</li>
         <li>Display ranks and scores computed for every possible SCI,AO,FT combinations with two filter fields to keep the best solutions.</li>
