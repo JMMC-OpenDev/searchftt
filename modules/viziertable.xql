@@ -12,7 +12,7 @@ import module namespace jmmc-tap="http://exist.jmmc.fr/jmmc-resources/tap" at "/
  :  or a map{$cat:($ra,$dec) for multiple table names.
  :)
 declare function local:get-RADEC-colnames($vizierTableIds as xs:string*){
-let $in := string-join($vizierTableIds!concat("'",.,"'"),",")
+let $in := string-join($vizierTableIds!concat("'",normalize-space(.),"'"),",")
 
 (:  get RA DEC col_names ordered by ucd for every table ids :)
 let $query := "
