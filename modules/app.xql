@@ -240,7 +240,7 @@ declare function app:datatable-script($score_index, $rank_index, $sci_ft_dist_in
     (: TODO try to avoid hardcoded indexes for datacolumns :)
     <script type="text/javascript">
 
-        let grays = culori.interpolate(['red', 'green']);
+        let grays = culori.interpolate(['FF6666', '#FFFF66', '#B2FFB2']);
 
         let formatTable = true;
         $(document).ready(function() {{
