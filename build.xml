@@ -36,6 +36,8 @@
   <copy file="node_modules/datatables.net-bs5/images/sort_desc.png" todir="resources/images" />
   <copy file="node_modules/datatables.net-bs5/images/sort_both.png" todir="resources/images" />
 
+  <copy file="node_modules/culori/bundled/culori.min.js"      todir="resources/scripts" />
+
   </target>
   <!-- Dev build (includes everything unoptimized) -->
   <target name="dev" depends="init" description="compile all source files">

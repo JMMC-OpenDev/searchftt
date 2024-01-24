@@ -10,6 +10,7 @@ let $config := app:config()
 
 (: Get form inputs :)
 let $identifiers := request:get-parameter("identifiers",())
+let $identifiers := if(exists($identifiers)) then $identifiers else string-replace(request:get-parameter("inputfile",()),"&#10;",";")
 let $catalogs := request:get-parameter("catalogs",())
 
 (: compute lists :)

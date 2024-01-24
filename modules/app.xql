@@ -239,7 +239,10 @@ declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*
 declare function app:datatable-script($score_index, $rank_index, $sci_ft_dist_index, $sci_ao_dist_index){
     (: TODO try to avoid hardcoded indexes for datacolumns :)
     <script type="text/javascript">
-        var formatTable = true; // TODO enhance table metadata so we rely on it and limit formating on some columns
+
+        let grays = culori.interpolate(['red', 'green']);
+
+        let formatTable = true;
         $(document).ready(function() {{
         // bulk filter
         const min_score = document.querySelector('#min_score');
@@ -284,7 +287,7 @@ declare function app:datatable-script($score_index, $rank_index, $sci_ft_dist_in
                 "targets": {$score_index - 1},
                 "createdCell": function (td, cellData, rowData, row, col) {{
                     if ( $(this)[0].id == 'bulkTable' ) {{
-                        $(td).css('background-color', `rgb(${{(1 - cellData) *256}}, ${{cellData*256}},0)`);
+                        $(td).css('background-color', culori.formatHex(culori.convertOklabToRgb(culori.convertRgbToOklab( grays(cellData)))));
                     }}
                 }}
             }},
@@ -292,8 +295,8 @@ declare function app:datatable-script($score_index, $rank_index, $sci_ft_dist_in
                 "targets": [ {$sci_ft_dist_index - 1 },{$sci_ao_dist_index - 1 } ],
                 "createdCell": function (td, cellData, rowData, row, col) {{
                     if ( $(this)[0].id == 'bulkTable' ) {{
-                        $l = cellData * 8.5 ;
-                        $(td).css('background-color', `rgb(${{$l}}, ${{256.0 -$l}},0)`);
+                        $l = 1 - ( cellData / {app:config()?max?dist_as} );
+                        $(td).css('background-color', culori.formatHex(culori.convertOklabToRgb(culori.convertRgbToOklab(grays($l)))));
                     }}
                 }}
             }}
