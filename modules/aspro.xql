@@ -2,8 +2,6 @@ xquery version "3.1";
 
 import module namespace app="http://exist.jmmc.fr/searchftt/apps/searchftt/templates" at "app.xql";
 
-(: Ask for download :)
-let $headers := response:set-header("Content-Disposition",' attachment; filename="SearchFTT.asprox"')
 
 (: Get config :)
 let $config := app:config()
@@ -50,6 +48,14 @@ let $aos-ids := $targetInfos?*?ao-ids
 (: prepare maps for Aspro2 sources description :)
 let $all-identifiers := distinct-values( ( map:keys($targetInfos), $fts-ids, $aos-ids) )
 let $targets-map := map:merge(($res?catalogs?*?targets-map, $res?identifiers-map)) (: last given map has the highest priority in this implementation :)
+
+(: Ask for download using proper header :)
+let $nmax:=10
+let $dots := if ( map:size($targetInfos) > $nmax ) then "..." else ()
+let $name := string-join((subsequence(map:keys($targetInfos), 1, $nmax), $dots), "_")
+let $headers := response:set-header("Content-Disposition",' attachment; filename="SearchFTT_'|| $name ||'.asprox"')
+
+
 
 return
 
