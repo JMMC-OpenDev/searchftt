@@ -619,7 +619,7 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
         </div></div>
     let $default-catalogs := for $cat in $app:conf?catalogs?* where exists($cat?bulk) order by $cat?main_cat descending return $cat?cat_name
     let $catalogs := if(exists($catalogs)) then $catalogs else $config?preferred?bulk_catalog
-    let $cats-params := for $catalog in $default-catalogs
+    let $cats-params := for $catalog in $default-catalogs order by $catalog
         return
             <div class="p-2"><div class="input-group">
                 <div class="input-group-text">
@@ -629,10 +629,12 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
     return
     (
     <div>
-<h1>SearchFFT: off-axis Fringe Tracking and Adaptative Optics for interferometry</h1>
+<h2>SearchFFT: off-axis Fringe Tracking and Adaptative Optics for interferometry</h2>
 <p>This tool searches for nearby stars suitable for off-axis Fringe Tracking and off-axis Adaptive Optics.
 <br/>
-You can query one or several Science Targets separated by semicolon by names (resolved using Simbad) or by coordinates (RA +/-DEC in degrees J2000). For each of them, suitable solutions will be searched. Only solutions with a valid AO and a valid FT are presented. When several solutions are found, a scoring and ranking is proposed based on a simplified model of AO (GPAO) and FT (GRAVITY) of VLTI. If the Science Target allows it, the on-axis solution is also presented and ranked.
+You can query one or several Science Targets separated by semicolon by names (resolved using Simbad) or by coordinates (RA +/-DEC in degrees J2000). For each of them, suitable solutions will be searched. Only solutions with a valid AO and a valid FT are presented. When several solutions are found, a scoring ( \(strehl_{{SCI}} . exp( -\sigma_{{\phi}}^2 ) . exp( -\sigma_{{iso}}^2 )\) ) and ranking is proposed based on a simplified model of AO (GPAO) and FT (GRAVITY) of VLTI. If the Science Target allows it, the on-axis solution is also presented and ranked.
+<br/>
+
 <br/>
 For the time being, only the NGS mode of GPAO is supported by the scoring. However, solutions can be found for the LGS mode by increasing the AO magnitude (but with wrong scoring and ranking).
 <br/>
@@ -647,7 +649,6 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
             <div class="d-flex p-2"><div class="p-2 justify-content-end"><label class="form-check-label ">Catalogs to query:</label></div>
                 {$cats-params}
             </div>
-
             <div class="d-flex p-2"><div class="p-2 justify-content-end">Constraints:</div>
                 {$max-inputs}
             </div>
@@ -802,7 +803,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
 
         <div class="p-2 d-flex">
             <div class="p-2 justify-content-end">Limit to :</div>
-            <div class="p-2"><div class="input-group"><span class="input-group-text" title="1= best perfo, 0= worst perfo">Min score of solutions <i class="bi bi-question-circle"></i></span><input type="text" id="min_score" name="min_score" value="{$config?min?score}"/></div></div>
+            <div class="p-2"><div class="input-group"><span class="input-group-text" title="1= best performance, 0= worst performance">Min score of solutions <i class="bi bi-question-circle"></i></span><input type="text" id="min_score" name="min_score" value="{$config?min?score}"/></div></div>
             <div class="p-2"><div class="input-group"><span class="input-group-text" title="this is the rank">Max number solutions per science <i class="bi bi-question-circle"></i></span><input type="text" id="max_rank" name="max_rank" value="{$max?rank}"/></div></div>
         </div>
         <div class="p-2 d-flex">
