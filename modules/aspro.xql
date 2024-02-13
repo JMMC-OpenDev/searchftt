@@ -19,7 +19,9 @@ let $sciences := distinct-values(for $m in $sciences-idx return map:keys($m))
 
 let $targetInfos := map:merge((
     for $science in distinct-values($sciences)
-        let $all-ftaos := array{ for $ranking in $res?catalogs?*?ranking
+        let $all-ftaos := array{ for $cat in $res?catalogs?*
+            let $ranking := $cat?ranking
+            let $targets-map := $cat?targets-map
             let $science-idx := $ranking?sciences-idx($science)
             let $scores := $ranking?scores?*
             let $science-idx := for $idx in $science-idx let $score:=$scores[$idx] where $score >= $config?min?score  order by $score descending return $idx
@@ -29,13 +31,14 @@ let $targetInfos := map:merge((
                 let $ftao := $ranking?ftaos?*[position()=$idx]
 
                 where  $pos <= $config?max?rank
-                return $ftao
+                (: use name from str_source_id resolved target :)
+                return array{ $targets-map($ftao?*[1])/name/text(), $targets-map($ftao?*[2])/name/text() }
 
             return $science-ftaos
         }
         (: limit science object with the one that have a solution :)
         where count($all-ftaos?*)>0
-        (: get distinct fts and aos :)
+        (: get distinct fts and aos (this are str_source_ids resolved by targets-maps) :)
         let $science-fts  := for $ftao in $all-ftaos?* group by $ft := $ftao?*[1] return $ft
         let $science-aos  := for $ftao in $all-ftaos?* group by $ao := $ftao?*[2] return $ao
         return
@@ -54,8 +57,6 @@ let $nmax:=3
 let $dots := if ( map:size($targetInfos) > $nmax ) then "..." else ()
 let $name := string-join((subsequence(map:keys($targetInfos), 1, $nmax), $dots), "_")
 let $headers := response:set-header("Content-Disposition",' attachment; filename="SearchFTT_'|| $name ||'.asprox"')
-
-
 
 return
 
