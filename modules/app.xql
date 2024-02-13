@@ -716,10 +716,13 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
         for $cat-name in map:keys($bulk-search-map?catalogs) return map:entry($cat-name, $bulk-search-map?catalogs($cat-name)?ranking?scores?* )
     ))
 
+    (: let $log := util:log("info", ``[identifiers returned : `{string-join(map:keys($identifiers-map), ", ")}`]``) :)
+
     let $trs :=  map:merge((
     for $identifier at $identifier-pos in map:keys($identifiers-map) order by $identifier
         let $science := map:get($identifiers-map, $identifier)
-        (: let $opacity := 100 - 50 * ($identifier-pos mod 2) :)
+        (: let $log := util:log("info", ``[identifier : `{$identifier}`]``) :)
+        let $identifier-name := data($science/name)
         return
             map:entry($identifier,
             for $cat-name in map:keys($bulk-search-map?catalogs)
@@ -728,7 +731,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
                 let $ranking := $cat?ranking
                 let $ftaos := $cat?ranking?ftaos
                 let $scores := $cat?ranking?scores
-                let $science-idx := $cat?ranking?sciences-idx?($identifier)
+                let $science-idx := $cat?ranking?sciences-idx?($identifier-name)
 
                 (: let $science-scores := for $idx in $science-idx return $cat?ranking?scores?*[$idx] This line is very cost effective !! prefer following one :)
                 let $science-scores := for $idx in $science-idx return $cat-sciences-scores($cat-name)[$idx]
@@ -807,7 +810,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
             <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/outputfile.xql">Get as SearchFTT input file</button></div>
             <!-- <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/test.xql">Test this list</button></div> -->
         </div>
-
+        <div class="extquery d-none">{for $q in $bulk-search-map?catalogs?*?ranking?query return <pre><br/>{data($q)}<br/></pre>}</div>
     </div>
 
     return
@@ -903,7 +906,8 @@ declare function app:bulk-search($identifiers-map, $cat) {
     let $config := app:config()
     let $max := $config("max")
 
-    let $input-votables :=  app:get-input-votables($ths, $trs, min((xs:integer($cat?tap_max_xmatch_votable_size), 10000 )))
+    (: let $input-votables :=  app:get-input-votables($ths, $trs, min((xs:integer($cat?tap_max_xmatch_votable_size), 10000 ))) leave max so the user can see the timeout :)
+    let $input-votables :=  app:get-input-votables($ths, $trs, max((xs:integer($cat?tap_max_xmatch_votable_size), 10000 )))
     let $query :=  app:build-query((), $input-votables[1], $max, $cat)
     let $query-code := <div class="extquery d-none">{for $q in $query return <pre><br/>{data($q)}<br/></pre>}</div>
 
@@ -1132,15 +1136,17 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
 
     let $internal-match := string-join((
         "SELECT",
-        string-join(
+        "  "||string-join(
             ("ft.science as science",
             $ftao-dist || " as ft_ao_dist_as",
             for $c in $colnames[not(.="science")] return
                 for $type in ("ft", "ao")
                     return string-join( (($type, ".", $c), " as ", $c, "_"[exists($c)], $type) )
-            ),", "),
-        " FROM TAP_UPLOAD."||$table-name||" as ft , TAP_UPLOAD."||$table-name||" as ao ",
-        " WHERE " || $ft-filters || " AND " || $ao-filters || " AND " || $dist-filter
+            ),",&#10;  "),
+        "FROM",
+        "  TAP_UPLOAD."||$table-name||" as ft , TAP_UPLOAD."||$table-name||" as ao ",
+        "WHERE",
+        "  " || $ft-filters || " AND " || $ao-filters || " AND " || $dist-filter
         ),"&#10;")
 
     return
@@ -1162,7 +1168,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $pmra := if($votname) then $votname||".my_pmra" else try{ xs:double($s/pmra) } catch * {0}
     let $pmdec := if($votname) then $votname||".my_pmdec" else try{ xs:double($s/pmdec) } catch * {0}
     let $upload-from := if($votname) then "TAP_UPLOAD."||$votname|| " as " ||$votname||", " else ()
-    let $science-name-col := if($votname) then $votname||".my_user_identifier as science, " else ()
+    let $science-name-col := if($votname) then $votname||".my_name as science, " else ()
     let $order-by := if($votname) then "science," else ()
 
     (: We could have built query with COALESCE to replace missing pmra by 0, but:
