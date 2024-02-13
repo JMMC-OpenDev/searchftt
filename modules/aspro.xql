@@ -50,7 +50,7 @@ let $all-identifiers := distinct-values( ( map:keys($targetInfos), $fts-ids, $ao
 let $targets-map := map:merge(($res?catalogs?*?targets-map, $res?identifiers-map)) (: last given map has the highest priority in this implementation :)
 
 (: Ask for download using proper header :)
-let $nmax:=10
+let $nmax:=3
 let $dots := if ( map:size($targetInfos) > $nmax ) then "..." else ()
 let $name := string-join((subsequence(map:keys($targetInfos), 1, $nmax), $dots), "_")
 let $headers := response:set-header("Content-Disposition",' attachment; filename="SearchFTT_'|| $name ||'.asprox"')
@@ -77,19 +77,19 @@ return
         <nightRestriction>true</nightRestriction>
         <atmosphereQuality>Average</atmosphereQuality>
     </when>
-    <!--<interferometerConfiguration>
+    {<!--<interferometerConfiguration>
         <name>VLTI Period 113</name>
         <minElevation>45.0</minElevation>
     </interferometerConfiguration>
-    -->
+    -->}
     <instrumentConfiguration>
-        <name>GRAVITY</name>
+        <name>GRAVITY</name>{
         <!--<stations>A0 G1 J2 J3</stations>
         <pops></pops>
         <instrumentMode>MEDIUM-COMBINED</instrumentMode>
         <samplingPeriod>60.0</samplingPeriod>
         <acquisitionTime>600.0</acquisitionTime>
-        -->
+        -->}
     </instrumentConfiguration>
     {
         for $identifier in $all-identifiers
@@ -123,10 +123,6 @@ return
                     </configuration>
                 :)
     }
-    <!--
-    can be removed
-    <selectedTargets>Sirius_B</selectedTargets>
-    -->
     <targetUserInfos>
         <group id="JMMC_AO">
             <name>AO Star</name>
