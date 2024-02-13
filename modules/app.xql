@@ -632,7 +632,7 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
 <h2>SearchFFT: off-axis Fringe Tracking and Adaptative Optics for interferometry</h2>
 <p>This tool searches for nearby stars suitable for off-axis Fringe Tracking and off-axis Adaptive Optics.
 <br/>
-You can query one or several Science Targets separated by semicolon by names (resolved using Simbad) or by coordinates (RA +/-DEC in degrees J2000). For each of them, suitable solutions will be searched. Only solutions with a valid AO and a valid FT are presented. When several solutions are found, a scoring ( \(strehl_{{SCI}} . exp( -\sigma_{{\phi}}^2 ) . exp( -\sigma_{{iso}}^2 )\) ) and ranking is proposed based on a simplified model of AO (GPAO) and FT (GRAVITY) of VLTI. If the Science Target allows it, the on-axis solution is also presented and ranked.
+You can query one or several Science Targets separated by semicolon by names (resolved using Simbad for proper motion) or by coordinates (RA +/-DEC in degrees J2000). For each of them, suitable solutions will be searched. Only solutions with a valid AO and a valid FT are presented. When several solutions are found, a scoring ( \(strehl_{{SCI}} . exp( -\sigma_{{\phi}}^2 ) . exp( -\sigma_{{iso}}^2 )\) ) and ranking is proposed based on a simplified model of AO (GPAO) and FT (GRAVITY) of VLTI. If the Science Target allows it, the on-axis solution is also presented and ranked.
 <br/>
 
 <br/>
@@ -688,10 +688,12 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
 };
 
 declare function app:simbad-link($id as xs:string, $target, $ra as xs:string?, $dec as xs:string?){
-    if (exists($target/ra/text())) then
+    if (exists($target/ra/text()) and empty($target/@position-only) ) then
         <a title="{$target/user_identifier}" href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}">{replace($target/name," ","&#160;")}</a>
     else if (exists($ra) and exists($dec) ) then
         <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$id}">{replace($id," ","&#160;")}</a>
+    else if (exists($target/ra) and exists($target/dec) ) then
+        <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$target/ra}+{$target/dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$id}">{replace($id," ","&#160;")}</a>
     else
         $target/user_identifier/text()
 };
@@ -751,7 +753,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
                         return
                             (: <tr class="opacity-{$opacity}"> :)
                             <tr>
-                                {for $col in $sci-cols return <td>{data($science/*[name(.)=$col])}</td>}
+                                {for $col in $sci-cols return <td>{ if($col=("name","user_identifier")) then app:simbad-link($science/*[name(.)=$col], $science,(),()) else data($science/*[name(.)=$col]) }</td>}
                                 {for $id in $ftao return <td>{app:simbad-link($id, $targets-map($id),(),())}</td>}
                                 <td>{$scores?*[$idx]}</td>
                                 <td>{$pos}</td>
