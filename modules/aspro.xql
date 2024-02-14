@@ -31,7 +31,7 @@ let $targetInfos := map:merge((
                 let $ftao := $ranking?ftaos?*[position()=$idx]
 
                 where  $pos <= $config?max?rank
-                (: use name from str_source_id resolved target :)
+                (: use resolved name of str_source_id values :)
                 return array{ $targets-map($ftao?*[1])/name/text(), $targets-map($ftao?*[2])/name/text() }
 
             return $science-ftaos
