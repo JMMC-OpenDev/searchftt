@@ -32,6 +32,7 @@ import module namespace jmmc-ws="http://exist.jmmc.fr/jmmc-resources/ws" at "/db
     - move magnitude field names to standart notation https://vizier.cds.unistra.fr/vizier/catstd/catstd.htx
     - do chunk of long votables before quering TAP
     - support coord+pm when simbad does resolv it!
+    - add objtypes while resolving simbad
 :)
 
 (: suffix used in maps to provide a text or html documentation :)
@@ -365,10 +366,11 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
     )
 };
 
-declare %private function app:fake-target($coords) {
+declare %private function app:fake-target($name as xs:string?, $coords as xs:string?) {
     let $coord := $coords => replace( "\+", " +") => replace ("\-", " -")
+    let $name := if($name) then $name else normalize-space($coords)
     let $t := for $e in tokenize($coord, " ")[string-length(.)>0]  return $e
-        return <target position-only="y"><user_identifier>{normalize-space($coords)}</user_identifier><name>{normalize-space($coords)}</name><ra>{$t[1]}</ra><dec>{$t[2]}</dec><pmra>0.0</pmra><pmdec>0.0</pmdec></target>
+        return <target fake-target="y"><user_identifier>{$name}</user_identifier><name>{$name}</name><ra>{$t[1]}</ra><dec>{$t[2]}</dec><pmra>0.0</pmra><pmdec>0.0</pmdec></target>
 };
 
 (:~
@@ -382,7 +384,7 @@ declare function app:resolve-by-name($name-or-coords) {
     then
         jmmc-simbad:resolve-by-name($name-or-coords)
     else
-        app:fake-target($name-or-coords)
+        app:fake-target((), $name-or-coords)
 };
 
 (:~
@@ -396,7 +398,7 @@ declare function app:resolve-by-names($name-or-coords) {
     let $coords := $name-or-coords[not(matches(., "[a-z]", "i"))] (: should we check for :)
 
     let $map := map:merge((
-        for $c in $coords return map:entry($c, app:fake-target($c))
+        for $c in $coords return map:entry($c, app:fake-target((),$c))
         ,
         if(exists(request:get-parameter("dry", ()))) then
             ()
@@ -417,7 +419,7 @@ declare function app:searchftt-list($identifiers as xs:string, $max as map(*) ) 
         for $id at $pos in $ids
         let $s := map:get($targets-maps, $id)
         let $log := util:log("info", <txt>loop {$pos} / {$count} : {$id} {$s} </txt>)
-        let $simbad-link := if($s/@position-only) then <a target="_blank" href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={encode-for-uri($id)}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec">{$id}</a> else <a target="_blank" href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}">{$id}</a>
+        let $simbad-link := if($s/@fake-target) then <a target="_blank" href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={encode-for-uri($id)}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec">{$id}</a> else <a target="_blank" href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}">{$id}</a>
         let $ra := $s/ra let $dec := $s/dec
         let $info := if(exists($s/ra))then
                 <ul class="list-group">
@@ -678,8 +680,6 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
             <div class="col-sm-2"><button type="submit" class="btn btn-primary" title="You may request to gather coordinates using a VizieR table name">Use VizieR table <i class="bi bi-question-circle"></i></button></div>
             <div class="col-sm-2"><input type="text" class="form-control" name="viziertable"/></div>
             <div class="col-sm-2">&#160; <a href="modules/viziertable.xql?viziertable=J/MNRAS/414/108/stars">(test J/MNRAS/414/108/stars)</a></div>
-
-
             </div></form>
             </div>
         }
@@ -688,12 +688,12 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
 };
 
 declare function app:simbad-link($id as xs:string, $target, $ra as xs:string?, $dec as xs:string?){
-    if (exists($target/ra/text()) and empty($target/@position-only) ) then
-        <a title="{$target/user_identifier}" href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}">{replace($target/name," ","&#160;")}</a>
+    if (exists($target/ra/text()) and empty($target/@fake-target) ) then
+        <a title="{$target/user_identifier} ( {$ra} {$dec} )" href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}" target="_blank">{replace($target/name," ","&#160;")}&#160;<i class="bi bi-arrow-up-right-square"></i></a>
     else if (exists($ra) and exists($dec) ) then
-        <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$id}">{replace($id," ","&#160;")}</a>
+        <span>{replace($id," ","&#160;")}<a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords ( {$ra} {$dec} ) because Simbad does't know : {$id}" target="_blank">&#160;<i class="bi bi-arrow-up-right-square"></i></a></span>
     else if (exists($target/ra/text()) and exists($target/dec/text()) ) then
-        <a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$target/ra}+{$target/dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords because Simbad does't know : {$id}">{replace($id," ","&#160;")}</a>
+        <span>{replace($id," ","&#160;")}<a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$target/ra}+{$target/dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords ( {$target/ra} {$target/dec} ) because Simbad does't know : {$id}" target="_blank">&#160;<i class="bi bi-arrow-up-right-square"></i></a></span>
     else
         $target/user_identifier/text()
 };
@@ -754,7 +754,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
                             (: <tr class="opacity-{$opacity}"> :)
                             <tr>
                                 {for $col in $sci-cols return <td>{ if($col=("name","user_identifier")) then app:simbad-link($science/*[name(.)=$col], $science,(),()) else data($science/*[name(.)=$col]) }</td>}
-                                {for $id in $ftao return <td>{app:simbad-link($id, $targets-map($id),(),())}</td>}
+                                {for $id in $ftao let $t := $targets-map($id) return <td>{app:simbad-link($id, $t,$t/ra,$t/dec)}</td>}
                                 <td>{$scores?*[$idx]}</td>
                                 <td>{$pos}</td>
                                 { let $tds := array:flatten($inputs?*[$idx]) return for $c at $pos in $ranking-input-params return <td>{$tds[$pos+1]}</td>}
@@ -970,8 +970,10 @@ declare function app:bulk-search($identifiers-map, $cat) {
             let $detail_fields_pos := for $e at $pos in $votable//*:FIELD/@name return if(lower-case($e)=$detail_cols) then $pos else ()
 
             let $field_names := for $e in $votable//*:FIELD/@name return lower-case($e)
+            let $colidx := map:merge( for $e at $pos in $votable//*:FIELD/@name return map:entry(replace(lower-case($e),"computed_",""), $pos) )
             let $science_idx := index-of($field_names, "science")
             let $source_id_idx := index-of($field_names, "source_id")
+            let $str_source_id_idx := index-of($field_names, "str_source_id")
             let $mag_k_idx := index-of($field_names, "mag_ks")
             let $mag_g_idx := index-of($field_names, "mag_g")
             let $mag_v_idx := (index-of($field_names, "mag_v"),index-of($field_names, "computed_mag_v"))
@@ -980,9 +982,19 @@ declare function app:bulk-search($identifiers-map, $cat) {
             let $ut_flag_idx := index-of($field_names, "ut_flag")
 
             let $trs := $votable//*:TR
-            (: compute simbad id adding a prefix to build a valid identifier :)
-            let $targets-ids := $trs/*[$source_id_idx]!concat($cat?simbad_prefix_id, .)
+            let $targets-ids := $trs/*[$colidx?str_source_id]
             let $targets-maps := app:resolve-by-names($targets-ids)
+            (: re add non resolved ones :)
+            let $targets-maps := map:merge((
+                $targets-maps,
+                map:merge(
+                    for $tr in $trs
+                        let $target-id:=$tr/*[$colidx?str_source_id]
+                        where not($targets-maps($target-id)/name/text())
+                        return
+                            map:entry($target-id,app:fake-target($target-id,$tr/*[$colidx?ra]||" "||$tr/*[$colidx?dec]))
+                )
+            ))
 
             let $nb_rows := count($votable//*:TR)
             let $count-ftao := if(exists($ranking?sciences-idx)) then count(map:keys($ranking?sciences-idx)) else ()
