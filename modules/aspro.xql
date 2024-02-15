@@ -17,6 +17,7 @@ let $res := app:searchftt-bulk-list($identifiers, $catalogs)
 let $sciences-idx := $res?catalogs?*?ranking?sciences-idx
 let $sciences := distinct-values(for $m in $sciences-idx return map:keys($m))
 
+(: rebuil association using resolved(or nont) name instead of str_source_ids:)
 let $targetInfos := map:merge((
     for $science in distinct-values($sciences)
         let $all-ftaos := array{ for $cat in $res?catalogs?*
@@ -53,7 +54,7 @@ let $all-identifiers := distinct-values( ( map:keys($targetInfos), $fts-ids, $ao
 let $targets-map := map:merge(($res?catalogs?*?targets-map, $res?identifiers-map)) (: last given map has the highest priority in this implementation :)
 
 (: Ask for download using proper header :)
-let $headers := response:set-header("Content-Disposition",' attachment; filename="SearchFTT_'|| $app:getFileSuffix($identifiers) ||'.asprox"')
+let $headers := response:set-header("Content-Disposition",' attachment; filename="SearchFTT_'|| app:getFileSuffix($identifiers) ||'.asprox"')
 
 return
 
@@ -150,8 +151,8 @@ return
         </groupMembers>
         {
             map:for-each($targetInfos, function ($science,$science-map){
-                let $science-fts:=$science-map?ft-ids
-                let $science-aos:=$science-map?ao-ids
+                let $science-fts:=$science-map?ft-ids[not(.=$science)]
+                let $science-aos:=$science-map?ao-ids[not(.=$science)]
                 return
                     <targetInfo>
                         <targetRef>{app:genTargetIds($science)}</targetRef>
