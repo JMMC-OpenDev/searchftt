@@ -72,13 +72,9 @@ return
               for $e in $l
                 return $trg[*[$colidx($c)]=$e]
             })
-            let $log := util:log("info", "valid trs 1")
-            let $log := util:log("info",$valid-trs)
             let $valid-trs := for $tr in $valid-trs group by $colname:=$tr/*[2]
               where count($tr)=count(map:size($col-constraints))
               return $tr[1]
-            let $log := util:log("info", "valid trs 2")
-            let $log := util:log("info",$valid-trs)
             return
               (: get only the first valid column_name :)
               map:entry( $col, head( $valid-trs/*[2] ) )
