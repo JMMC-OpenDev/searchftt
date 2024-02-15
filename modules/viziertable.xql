@@ -8,6 +8,7 @@ import module namespace jmmc-tap="http://exist.jmmc.fr/jmmc-resources/tap" at "/
 
 (: Search for 20th vizier tables names starting with a given prefix (eg. catalog ID ):)
 declare function local:getTables($vizierTablePrefix as xs:string){
+let $vizierTablePrefix := normalize-space($vizierTablePrefix)
 let $query := "
 SELECT
   *
@@ -36,37 +37,58 @@ return
 declare function local:getNameOrCoordColnames($vizierTableIds as xs:string*){
 let $in := string-join($vizierTableIds!concat("'",normalize-space(.),"'"),",")
 
-let $ucds4cols := map{
-  "ra":('pos.eq.ra;meta.main','pos.eq.ra')
-  ,"dec":('pos.eq.dec;meta.main','pos.eq.dec')
-  ,"name": 'meta.id;meta.main'
-  }
+let $constraints := map{
+  "ra": map{"unit": "deg", "ucd":('pos.eq.ra;meta.main','pos.eq.ra')}
+  ,"dec": map{"unit": "deg", "ucd":('pos.eq.dec;meta.main','pos.eq.dec')}
+  ,"name": map{"datatype":"CHAR","ucd": ('meta.id;meta.main', 'meta.id')} (: CHAR is for VARCHAR, CHAR(20) :)
+}
+
 (:  get col_names ordered by ucds for every table ids :)
 let $query := "
 SELECT
-  table_name, column_name, ucd
+  table_name, column_name, "||string-join(distinct-values( $constraints?* ! map:keys(.) ), ", " )||"
 FROM
   TAP_SCHEMA.columns
 WHERE
   table_name IN ("||$in||")
     AND
-  ucd IN ("|| string-join($ucds4cols?* ! concat("'",.,"'") , ", ")||")
+  ucd IN ("|| string-join($constraints?*?ucd ! concat("'",.,"'") , ", ")||")
 "
 
-let $trs-vot := jmmc-tap:tap-adql-query("http://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync", $query, count($vizierTableIds) * 20)
-let $trs := $trs-vot//*:TR
+let $votable := jmmc-tap:tap-adql-query("http://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync", $query, count($vizierTableIds) * 20)
+let $colidx := map:merge( for $e at $pos in $votable//*:FIELD/@name return map:entry($e, $pos) )
+let $trs := $votable//*:TR
 
 (: group by table names and use head() to get first column that matches the ucds :)
 return
   map:merge((
     for $trg in $trs group by $table := ($trg/*:TD)[1]
       return
-        map:merge(for $col in map:keys($ucds4cols) return map:entry($col, head( $trg[./*[3]=$ucds4cols($col)]/*[2] ) ))
+        map:merge(
+          for $col in map:keys($constraints)
+            let $col-constraints := $constraints($col)
+            (: keep lines with valid constraints (first list item get higher priority) :)
+            let $valid-trs := map:for-each($col-constraints, function($c, $l){
+              for $e in $l
+                return $trg[*[$colidx($c)]=$e]
+            })
+            let $log := util:log("info", "valid trs 1")
+            let $log := util:log("info",$valid-trs)
+            let $valid-trs := for $tr in $valid-trs group by $colname:=$tr/*[2]
+              where count($tr)=count(map:size($col-constraints))
+              return $tr[1]
+            let $log := util:log("info", "valid trs 2")
+            let $log := util:log("info",$valid-trs)
+            return
+              (: get only the first valid column_name :)
+              map:entry( $col, head( $valid-trs/*[2] ) )
+        )
   ))
 };
 
 declare function local:getNamesOrCoords($tableId as xs:string)
 {
+    let $tableId := normalize-space($tableId)
     let $colinfo := local:getNameOrCoordColnames($tableId)
     (: let $log := util:log("info", "Searching idorcoord cols in '"|| $tableId ||"' with '"||serialize($colinfo,map {"method": "adaptive"})||"'") :)
 
@@ -91,7 +113,7 @@ declare function local:getNamesOrCoords($tableId as xs:string)
  - put in session info or error
  - redirect for execution
 :)
-let $viziertable :=request:get-parameter("viziertable",())
+let $viziertable := normalize-space(request:get-parameter("viziertable",()))
 let $log := util:log("info", "quering VizieR for "|| $viziertable)
 return
     if(empty($viziertable)) then () else
