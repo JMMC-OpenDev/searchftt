@@ -226,7 +226,8 @@ declare function app:config() as map(*){
 };
 
 declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*), $identifiers as xs:string*) {
-    let $toggle-classes := map{ "extcats" : "extended catalogs", "extquery" : "queries", "exttable" : "hide tables", "extorphan" : "hide orphans", "extdebug" : "debug" }
+    let $toggle-classes := map{ (:"extcats" : "extended catalogs", :) "extquery" : "queries", "exttable" : "hide tables", (: "extorphan" : "hide orphans",:) "extdebug" : "debug" }
+
     return
         <li class="nav-link">{
             map:for-each( $toggle-classes, function ($k, $label) {
@@ -586,7 +587,7 @@ declare function app:get-identifiers-from-file($indentifiersFile as xs:string*){
     else ()
 };
 
-declare %templates:wrap function app:bulk-form($node as node(), $model as map(*), $identifiers as xs:string*, $catalogs as xs:string*) {
+declare %templates:wrap function app:bulk-form($node as node(), $model as map(*), $identifiers as xs:string*, $catalogs as xs:string*, $viziertable as xs:string?) {
     for $type in ("success", "danger")
         where exists(session:get-attribute($type))
         return
@@ -595,11 +596,11 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
     ,
-    app:bulk-form-html($identifiers, $catalogs)
+    app:bulk-form-html($identifiers, $catalogs, $viziertable)
     ,try{ session:clear() }catch *{ () }
 };
 
-declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:string*) {
+declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:string*, $viziertable as xs:string?) {
     let $start-time := util:system-time()
     let $config := app:config()
     let $max := $config("max")
@@ -678,7 +679,7 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
             </div></form>
             <form method="post" action="modules/viziertable.xql"><div class="d-flex p-2">
             <div class="col-sm-2"><button type="submit" class="btn btn-primary" title="You may request to gather coordinates using a VizieR table name">Use VizieR table <i class="bi bi-question-circle"></i></button></div>
-            <div class="col-sm-2"><input type="text" class="form-control" name="viziertable"/></div>
+            <div class="col-sm-2"><input type="text" class="form-control" name="viziertable" value="{$viziertable}"/></div>
             <div class="col-sm-2">&#160; <a href="modules/viziertable.xql?viziertable=J/MNRAS/414/108/stars">(test J/MNRAS/414/108/stars)</a></div>
             </div></form>
             </div>
@@ -786,7 +787,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
     let $log := util:log("info", "done ("||seconds-from-duration(util:system-time()-$start-time)||"s)")
 
     let $targets :=<div><h3>{ count(map:for-each($trs, function($k,$v){if(exists($v)) then $k else ()})) } targets with both FT and AO solutions
-        <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="input.vot">votable</a>&#160;
+        <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="input_{app:getFileSuffix($identifiers)}.vot">votable</a>&#160;
         {(:)
             for $cat-name in map:keys($bulk-search-map?catalogs)
                 let $v := $bulk-search-map?catalogs($cat-name)?ranking?res
@@ -993,6 +994,7 @@ declare function app:bulk-search($identifiers-map, $cat) {
                         where not($targets-maps($target-id)/name/text())
                         return
                             map:entry($target-id,app:fake-target($target-id,$tr/*[$colidx?ra]||" "||$tr/*[$colidx?dec]))
+                            (: TODO add all other information from the catalog to the star so we can enahnce aspro2 target :)
                 )
             ))
 
@@ -1005,7 +1007,7 @@ declare function app:bulk-search($identifiers-map, $cat) {
                     <div class="{if($cat?main_cat) then () else "extcats d-none"}">
                     <h3>
                         {$cat?cat_name} ({$nb_rows} FT or AO stars)&#160;
-                        <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="searchftt_{$cat?cat_name}.vot">votable</a>
+                        <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="searchftt_{$cat?cat_name}_{app:getFileSuffix(request:get-parameter("identifiers",()))}.vot">votable</a>
                     </h3>
                     <ul>
                     <li> {$input-targets-count} targets queried </li>
@@ -1307,4 +1309,13 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
 declare function app:genTargetIds($names as xs:string*) as xs:string*
 {
     $names ! translate(., ' &lt;&gt;?,;:/!*%$^&amp;~#{[|`\^@]}°', '______________________________')
+};
+
+
+declare function app:getFileSuffix($identifiers as xs:string*) as xs:string
+{
+    let $nmax:=3
+    let $dots := if ( count($identifiers) > $nmax ) then "..." else ()
+    return
+        string-join((subsequence($identifiers, 1, $nmax), $dots), "_")
 };

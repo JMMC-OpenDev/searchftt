@@ -53,10 +53,7 @@ let $all-identifiers := distinct-values( ( map:keys($targetInfos), $fts-ids, $ao
 let $targets-map := map:merge(($res?catalogs?*?targets-map, $res?identifiers-map)) (: last given map has the highest priority in this implementation :)
 
 (: Ask for download using proper header :)
-let $nmax:=3
-let $dots := if ( map:size($targetInfos) > $nmax ) then "..." else ()
-let $name := string-join((subsequence(map:keys($targetInfos), 1, $nmax), $dots), "_")
-let $headers := response:set-header("Content-Disposition",' attachment; filename="SearchFTT_'|| $name ||'.asprox"')
+let $headers := response:set-header("Content-Disposition",' attachment; filename="SearchFTT_'|| $app:getFileSuffix($identifiers) ||'.asprox"')
 
 return
 
