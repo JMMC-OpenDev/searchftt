@@ -6,7 +6,7 @@ import module namespace jmmc-tap="http://exist.jmmc.fr/jmmc-resources/tap" at "/
 
 (: TODO move next local function into jmmc:vizier module :)
 
-
+(: Search for 20th vizier tables names starting with a given prefix (eg. catalog ID ):)
 declare function local:getTables($vizierTablePrefix as xs:string){
 let $query := "
 SELECT
@@ -17,7 +17,7 @@ WHERE
   table_name LIKE '"||$vizierTablePrefix||"%'
 "
 
-let $votable := jmmc-tap:tap-adql-query("http://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync", $query, -1)
+let $votable := jmmc-tap:tap-adql-query("http://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync", $query, 20)
 let $trs := $votable//*:TR
 (: schema_name	table_name	table_type	description	utype	nrows :)
 let $colidx := map:merge( for $e at $pos in $votable//*:FIELD/@name return map:entry($e, $pos) )
@@ -51,11 +51,9 @@ WHERE
   table_name IN ("||$in||")
     AND
   ucd IN ("|| string-join($ucds4cols?* ! concat("'",.,"'") , ", ")||")
-ORDER BY
-  ucd DESC
 "
 
-let $trs-vot := jmmc-tap:tap-adql-query("http://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync", $query, -1)
+let $trs-vot := jmmc-tap:tap-adql-query("http://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync", $query, count($vizierTableIds) * 20)
 let $trs := $trs-vot//*:TR
 
 (: group by table names and use head() to get first column that matches the ucds :)
@@ -113,8 +111,11 @@ return
             }
             </span>)
         else
-            session:set-attribute('success',<span>Found {count($identifiers)} coordinates {"( max limit used )"[count($identifiers)=app:config()?max?rows_from_vizier]} in the <em>{$t-link}</em> VizieR Table.</span>)
+            let $cols := local:getNameOrCoordColnames($viziertable)
+            return
+              session:set-attribute('success',<span>Found {count($identifiers)} ids or coordinates trying name or coords (from { map:for-each($cols, function($col, $name){if($name) then <em>{$col} = <b>{$name}</b>&#160;</em> else ()})  }) {"( max limit used )"[count($identifiers)=app:config()?max?rows_from_vizier]} in the <em>{$t-link}</em> VizieR Table.</span>)
     let $log := util:log("info", "identifiers found :  "|| count($identifiers))
     let $store := session:set-attribute('identifiers', string-join($identifiers, ';') )
+    let $store := session:set-attribute('viziertable', $viziertable )
     let $redirect := response:redirect-to(xs:anyURI("../bulk.html"))
     return <session-set>identifiers set for session {session:get-id()}</session-set>
