@@ -119,6 +119,7 @@ return
             session:set-attribute('danger',<span>Sorry no coordinates or identifiers found in the <em>{$t-link}</em> <br/>
             {
               let $tables := local:getTables($viziertable)?*
+              where exists($tables)
               return
                 (
                   "But you may try with :",
