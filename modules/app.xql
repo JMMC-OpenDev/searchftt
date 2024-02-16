@@ -864,7 +864,7 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $catalogs-t
     let $catalogs-to-query := if(exists($catalogs-to-query)) then $catalogs-to-query else $config?preferred?bulk_catalog
 
     (: Cleanup requested ids and get Simbad or basic informations for each of them :)
-    let $ids := distinct-values($identifiers ! tokenize(., ";")!normalize-space(.))[string-length()>0]
+    let $ids := distinct-values($identifiers ! tokenize(., ";") ! tokenize(., "&#9;") ! normalize-space(.))[string-length()>0]
     let $identifiers-map := app:resolve-by-names($ids)
 
     let $catalogs := map:merge((
