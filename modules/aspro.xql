@@ -99,7 +99,7 @@ return
             let $target-id := app:genTargetIds($identifier)
             let $target := $targets-map($identifier) :)
 
-        for $targets in $targets-map?* group by $name := $targets/name
+        for $targets in $targets-map?* group by $name := $targets/name/text()
             let $target-id := app:genTargetIds($name)
             return
                 let $target := $targets[1] return
