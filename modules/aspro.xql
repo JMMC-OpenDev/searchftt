@@ -17,7 +17,7 @@ let $res := app:searchftt-bulk-list($identifiers, $catalogs)
 let $sciences-idx := $res?catalogs?*?ranking?sciences-idx
 let $sciences := distinct-values(for $m in $sciences-idx return map:keys($m))
 
-(: rebuil association using resolved(or nont) name instead of str_source_ids:)
+(: rebuil association using resolved(or not) name instead of str_source_ids:)
 let $targetInfos := map:merge((
     for $science in distinct-values($sciences)
         let $all-ftaos := array{ for $cat in $res?catalogs?*
@@ -52,6 +52,10 @@ let $aos-ids := $targetInfos?*?ao-ids
 (: prepare maps for Aspro2 sources description :)
 let $all-identifiers := distinct-values( ( map:keys($targetInfos), $fts-ids, $aos-ids) )
 let $targets-map := map:merge(($res?catalogs?*?targets-map, $res?identifiers-map)) (: last given map has the highest priority in this implementation :)
+let $aspro-cols := $app:conf?aspro-cols
+
+(:let $log := util:log("info","targets")
+let $log := util:log("info",$targets-map):)
 
 (: Ask for download using proper header :)
 let $headers := response:set-header("Content-Disposition",' attachment; filename="SearchFTT_'|| app:getFileSuffix($identifiers) ||'.asprox"')
@@ -91,19 +95,26 @@ return
         -->}
     </instrumentConfiguration>
     {
-        for $identifier in $all-identifiers
+        (:for $identifier in $all-identifiers
             let $target-id := app:genTargetIds($identifier)
-            let $target := $targets-map($identifier)
-            let $name := if($target/name/text()) then $target/name/text() else $identifier
+            let $target := $targets-map($identifier) :)
+
+        for $targets in $targets-map?* group by $name := $targets/name
+            let $target-id := app:genTargetIds($name)
             return
+                let $target := $targets[1] return
                 <target id="{$target-id}">
                     <name>{$name}</name>
                     <RA>{data($target/ra)}</RA>
                     <DEC>{data($target/dec)}</DEC>
                     <EQUINOX>2000.0</EQUINOX>
-                    <PMRA>{data($target/pmra)}</PMRA>
-                    <PMDEC>{data($target/pmdec)}</PMDEC>
-                    {if($target/name != $target/user_identifier) then <IDS>{$target/user_identifier/text()}</IDS> else ()}
+                    { let $ids := (
+                        if($target/name != $target/user_identifier) then $target/user_identifier else ()
+                        )
+                        return if ($ids) then <IDS>{string-join($ids,", ")}</IDS> else ()
+                    }
+                    {if(empty($target/@fake-target)) then (<PMRA>{data($target/pmra)}</PMRA>,<PMDEC>{data($target/pmdec)}</PMDEC>)
+                    else $target/*[name()=$aspro-cols?*]}
                 </target>
                 (: <PARALLAX>376.6801</PARALLAX>
                     <PARA_ERR>0.4526</PARA_ERR>

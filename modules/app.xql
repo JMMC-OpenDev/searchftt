@@ -62,6 +62,7 @@ declare variable $app:json-conf :='{
         "preferred_bulk_catalog" : "Gaia DR3",
         "max_rows_from_vizier" : 500
     },
+    "aspro-cols" : {"pmra":"PMRA", "pmdec":"PMDEC", "mag_v": "FLUX_V", "mag_r": "FLUX_R", "mag_g": "FLUX_G", "mag_ks": "FLUX_K"},
     "extended-cols" : [ "pmra", "pmdec", "pmde", "epoch", "cat_dist_as", "today_dist_as", "id", "str_source_id", "name" ],
     "samestar-dist_deg" : 2.78E-4,
     "samestar-dist_as" : 1,
@@ -367,11 +368,49 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
     )
 };
 
-declare %private function app:fake-target($name as xs:string?, $coords as xs:string?) {
+
+(:~
+ Build a fake target record mimicing jmmc-simbad format.
+ If votable-tr and colidx are provided, try to search for aspro2 fluxes FLUX_V,R,G,K
+
+ let $colidx := map:merge( for $e at $pos in $votable//*:FIELD/@name return map:entry(replace(lower-case($e),"computed_",""), $pos) )
+
+ @param $votable-tr optional votable tr
+ @param $colidx optional map of td indexes to search into given votable-tr/*:TD
+
+:)
+declare %private function app:fake-target($name as xs:string?, $coords as xs:string?,$votable-tr as node()?, $colidx as map(*)?) {
     let $coord := $coords => replace( "\+", " +") => replace ("\-", " -")
     let $name := if($name) then $name else normalize-space($coords)
     let $t := for $e in tokenize($coord, " ")[string-length(.)>0]  return $e
-        return <target fake-target="y"><user_identifier>{$name}</user_identifier><name>{$name}</name><ra>{$t[1]}</ra><dec>{$t[2]}</dec><pmra>0.0</pmra><pmdec>0.0</pmdec></target>
+    let $additional-info := if(exists($votable-tr)) then
+        let $tds := $votable-tr/*:TD
+        let $aspro-elements := map:for-each($app:conf?aspro-cols,
+            function ($tr-col, $aspro-col){
+                let $td-value := $tds[$colidx($tr-col)]/text()
+                return if(exists($td-value)) then element {$aspro-col} {data($td-value)} else ()
+            }
+        )(:
+        let $log := util:log("info", "addtional info")
+        let $log := util:log("info", $votable-tr)
+        let $log := util:log("info", $colidx)
+        let $log := util:log("info", $aspro-elements) :)
+        return $aspro-elements
+        else
+            ()
+    let $fake-target :=
+        <target fake-target="y">
+            <user_identifier>{$name}</user_identifier>
+            <name>{$name}</name>
+            <ra>{$t[1]}</ra>
+            <dec>{$t[2]}</dec>
+            <pmra>-0.0</pmra>
+            <pmdec>-0.0</pmdec>
+            {$additional-info}
+        </target>
+    (: let $log := util:log("info", "fake-target:")
+    let $log := util:log("info", $fake-target) :)
+    return $fake-target
 };
 
 (:~
@@ -385,7 +424,7 @@ declare function app:resolve-by-name($name-or-coords) {
     then
         jmmc-simbad:resolve-by-name($name-or-coords)
     else
-        app:fake-target((), $name-or-coords)
+        app:fake-target((), $name-or-coords, (), ())
 };
 
 (:~
@@ -399,7 +438,7 @@ declare function app:resolve-by-names($name-or-coords) {
     let $coords := $name-or-coords[not(matches(., "[a-z]", "i"))] (: should we check for :)
 
     let $map := map:merge((
-        for $c in $coords return map:entry($c, app:fake-target((),$c))
+        for $c in $coords return map:entry($c, app:fake-target((),$c, (), ()))
         ,
         if(exists(request:get-parameter("dry", ()))) then
             ()
@@ -993,8 +1032,7 @@ declare function app:bulk-search($identifiers-map, $cat) {
                         let $target-id:=$tr/*[$colidx?str_source_id]
                         where not($targets-maps($target-id)/name/text())
                         return
-                            map:entry($target-id,app:fake-target($target-id,$tr/*[$colidx?ra]||" "||$tr/*[$colidx?dec]))
-                            (: TODO add all other information from the catalog to the star so we can enahnce aspro2 target :)
+                            map:entry($target-id,app:fake-target($target-id,$tr/*[$colidx?ra]||" "||$tr/*[$colidx?dec], $tr, $colidx))
                 )
             ))
 
@@ -1133,7 +1171,7 @@ declare function app:get-ranking($votable, $cat, $max) {
                 return map:entry($science,$pos)
         ))
 
-        let $log := util:log("info", "  done ("||seconds-from-duration(util:system-time()-$start-time)||"s  / "||seconds-from-duration($start-time3 - $start-time2) ||" for webservice) for || array:size($scores) || analysed solutions")
+        let $log := util:log("info", "  done ("||seconds-from-duration(util:system-time()-$start-time)||"s  / "||seconds-from-duration($start-time3 - $start-time2) ||" for webservice) for "|| array:size($scores) || " analysed solutions")
         return
             map{"res":$res, "cat":$cat?cat_name, "error":$error, "query": $internal-match-query, "sciences-idx" : $map-by-sci , "ftaos": $ftaos ,"scores": $scores, "inputs":$inputs, "input-params":$input-params}
 };
