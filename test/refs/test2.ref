@@ -21,9 +21,7 @@
         -->
     </instrumentConfiguration>
     <target id="HD_195019">
-        <name>
-            <name>HD 195019</name>
-        </name>
+        <name>HD 195019</name>
         <RA>307.0776528398445</RA>
         <DEC>18.769494565131108</DEC>
         <EQUINOX>2000.0</EQUINOX>

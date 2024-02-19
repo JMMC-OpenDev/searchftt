@@ -21,9 +21,7 @@
         -->
     </instrumentConfiguration>
     <target id="HD_____11">
-        <name>
-            <name>HD     11</name>
-        </name>
+        <name>HD     11</name>
         <RA>1.2605308940299997</RA>
         <DEC>-59.714202596110006</DEC>
         <EQUINOX>2000.0</EQUINOX>
@@ -32,9 +30,7 @@
         <PMDEC>17.898</PMDEC>
     </target>
     <target id="HD_____10">
-        <name>
-            <name>HD     10</name>
-        </name>
+        <name>HD     10</name>
         <RA>1.27849872909</RA>
         <DEC>-42.56787349182999</DEC>
         <EQUINOX>2000.0</EQUINOX>
@@ -43,9 +39,7 @@
         <PMDEC>-24.079</PMDEC>
     </target>
     <target id="Gaia_DR3_4995668777728265472">
-        <name>
-            <name>Gaia DR3 4995668777728265472</name>
-        </name>
+        <name>Gaia DR3 4995668777728265472</name>
         <RA>1.2784168681284114</RA>
         <DEC>-42.56777923882084</DEC>
         <EQUINOX>2000.0</EQUINOX>
@@ -57,9 +51,7 @@
         <FLUX_G>12.078652</FLUX_G>
     </target>
     <target id="BD+29__5059B">
-        <name>
-            <name>BD+29  5059B</name>
-        </name>
+        <name>BD+29  5059B</name>
         <RA>1.29164383082</RA>
         <DEC>30.331224618750007</DEC>
         <EQUINOX>2000.0</EQUINOX>
@@ -68,9 +60,7 @@
         <PMDEC>-34.429</PMDEC>
     </target>
     <target id="HD______4">
-        <name>
-            <name>HD      4</name>
-        </name>
+        <name>HD      4</name>
         <RA>1.28847210239</RA>
         <DEC>30.329030137149992</DEC>
         <EQUINOX>2000.0</EQUINOX>
@@ -79,9 +69,7 @@
         <PMDEC>-32.217</PMDEC>
     </target>
     <target id="HD______3">
-        <name>
-            <name>HD      3</name>
-        </name>
+        <name>HD      3</name>
         <RA>1.2906594526400004</RA>
         <DEC>45.229030775610006</DEC>
         <EQUINOX>2000.0</EQUINOX>
@@ -90,9 +78,7 @@
         <PMDEC>-20.062</PMDEC>
     </target>
     <target id="HD______2">
-        <name>
-            <name>HD      2</name>
-        </name>
+        <name>HD      2</name>
         <RA>1.2748040687099997</RA>
         <DEC>57.770334610759996</DEC>
         <EQUINOX>2000.0</EQUINOX>
@@ -101,9 +87,7 @@
         <PMDEC>73.868</PMDEC>
     </target>
     <target id="HD______1">
-        <name>
-            <name>HD      1</name>
-        </name>
+        <name>HD      1</name>
         <RA>1.28683560187</RA>
         <DEC>67.83999458374</DEC>
         <EQUINOX>2000.0</EQUINOX>
@@ -112,9 +96,7 @@
         <PMDEC>-5.045</PMDEC>
     </target>
     <target id="HD______8">
-        <name>
-            <name>HD      8</name>
-        </name>
+        <name>HD      8</name>
         <RA>1.29055387174</RA>
         <DEC>-4.034652609939999</DEC>
         <EQUINOX>2000.0</EQUINOX>
@@ -123,9 +105,7 @@
         <PMDEC>0.924</PMDEC>
     </target>
     <target id="HD______7">
-        <name>
-            <name>HD      7</name>
-        </name>
+        <name>HD      7</name>
         <RA>1.2940051805</RA>
         <DEC>-1.8536464482500006</DEC>
         <EQUINOX>2000.0</EQUINOX>
@@ -134,9 +114,7 @@
         <PMDEC>-10.134</PMDEC>
     </target>
     <target id="HD______6">
-        <name>
-            <name>HD      6</name>
-        </name>
+        <name>HD      6</name>
         <RA>1.26592812798</RA>
         <DEC>-0.5030357267800001</DEC>
         <EQUINOX>2000.0</EQUINOX>
@@ -145,9 +123,7 @@
         <PMDEC>-53.594</PMDEC>
     </target>
     <target id="HD______5">
-        <name>
-            <name>HD      5</name>
-        </name>
+        <name>HD      5</name>
         <RA>1.29242976948</RA>
         <DEC>2.39721009183</DEC>
         <EQUINOX>2000.0</EQUINOX>
@@ -156,9 +132,7 @@
         <PMDEC>-41.47</PMDEC>
     </target>
     <target id="HD______9">
-        <name>
-            <name>HD      9</name>
-        </name>
+        <name>HD      9</name>
         <RA>1.2816077350899997</RA>
         <DEC>-20.612907058770002</DEC>
         <EQUINOX>2000.0</EQUINOX>
