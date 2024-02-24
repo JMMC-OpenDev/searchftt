@@ -37,8 +37,8 @@ function astro:from-hms($raHms as xs:string) as xs:double {
     let $hm := xs:double(head(($tokens[2],0.0)))
     let $hs := xs:double(head(($tokens[3],0.0)))
 
-    (: Get sign of hh which has to be propagated to hm and hs :)
-    let $sign := if($hh>0) then 1.0 else -1.0
+    (: Get sign sign which has to be propagated to hm and hs (covers -00 case ):)
+    let $sign := if(starts-with($raHms, "-")) then -1.0 else 1.0
 
     (: Convert to degrees
         note : hh already includes the sign :)
@@ -69,11 +69,11 @@ function astro:from-dms($decDms as xs:string) as xs:double {
     let $hm := xs:double(head(($tokens[2],0.0)))
     let $hs := xs:double(head(($tokens[3],0.0)))
 
-    (: Get sign of hh which has to be propagated to hm and hs :)
-    let $sign := if($hh>0) then 1.0 else -1.0
+    (: Get sign which has to be propagated to hm and hs (covers -00 case ):)
+    let $sign := if(starts-with($decDms, "-")) then -1.0 else 1.0
 
     (: Convert to degrees
         note : hh already includes the sign :)
-    let $dec := $hh + $sign * ( $hm div 60.0 + $hs div 3600 )
+    let $dec := $hh + $sign * ( $hm div 60.0 + $hs div 3600.0 )
     return $dec
 };
