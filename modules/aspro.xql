@@ -16,12 +16,14 @@ let $res := app:searchftt-bulk-list($identifiers, $catalogs)
 (: gather results :)
 let $sciences-idx := $res?catalogs?*?ranking?sciences-idx
 let $sciences := distinct-values(for $m in $sciences-idx return map:keys($m))
+(: let $log := util:log("info", "sciences : " || string-join($sciences)) :)
 
 (: rebuil association using resolved(or not) name instead of str_source_ids:)
 let $targetInfos := map:merge((
     for $science in distinct-values($sciences)
         let $all-ftaos := array{ for $cat in $res?catalogs?*
-            let $ranking := $cat?ranking
+            return
+            try{ let $ranking := $cat?ranking
             let $targets-map := $cat?targets-map
             let $science-idx := $ranking?sciences-idx($science)
             let $scores := $ranking?scores?*
@@ -36,6 +38,9 @@ let $targetInfos := map:merge((
                 return array{ $targets-map($ftao?*[1])/name/text(), $targets-map($ftao?*[2])/name/text() }
 
             return $science-ftaos
+            }catch *{
+                () (: ignore cat without match :)
+            }
         }
         (: limit science object with the one that have a solution :)
         where count($all-ftaos?*)>0
