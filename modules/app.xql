@@ -46,7 +46,7 @@ declare variable $app:json-conf :='{
         "max_magK_AT" : 10,
         "max_magR" : 12.5,
 
-        "max_AO_mag": 12,
+        "max_AO_mag": 12.5,
         "max_AO_mag_doc": "use Gmag if present in catalogs else Rmag or Vmag",
         "max_FT_mag": 12,
 
