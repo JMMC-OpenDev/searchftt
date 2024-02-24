@@ -15,6 +15,7 @@ import module namespace config="http://exist.jmmc.fr/searchftt/apps/searchftt/co
 import module namespace jmmc-tap="http://exist.jmmc.fr/jmmc-resources/tap" at "/db/apps/jmmc-resources/content/jmmc-tap.xql";
 import module namespace jmmc-simbad="http://exist.jmmc.fr/jmmc-resources/simbad" at "/db/apps/jmmc-resources/content/jmmc-simbad.xql";
 import module namespace jmmc-ws="http://exist.jmmc.fr/jmmc-resources/ws" at "/db/apps/jmmc-resources/content/jmmc-ws.xql";
+import module namespace astro="http://exist.jmmc.fr/searchftt/astro" at "astro.xql";
 
 (:import module namespace jmmc-astro="http://exist.jmmc.fr/jmmc-resources/astro" at "/db/apps/jmmc-resources/content/jmmc-astro.xql";:) (: WARNING this module require to enable eXistDB's Java Binding :)
 
@@ -380,9 +381,18 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
 
 :)
 declare %private function app:fake-target($name as xs:string?, $coords as xs:string?,$votable-tr as node()?, $colidx as map(*)?) {
-    let $coord := $coords => replace( "\+", " +") => replace ("\-", " -")
     let $name := if($name) then $name else normalize-space($coords)
+    let $coord := $coords => replace( "\+", " +") => replace ("\-", " -")
     let $t := for $e in tokenize($coord, " ")[string-length(.)>0]  return $e
+    let $t := try{
+            if(matches($coords, ":")) then (astro:from-hms($t[1]), astro:from-dms($t[2])) else $t
+        }catch*{(0,0)}
+    let $t := try{
+            if(count($t)>2) then
+                (astro:from-hms(string-join($t[position()<4], ":" )), astro:from-dms(string-join($t[position()>3], ":" )))
+            else
+                $t
+        }catch*{(0,0)}
     let $additional-info := if(exists($votable-tr)) then
         let $tds := $votable-tr/*:TD
         let $aspro-elements := map:for-each($app:conf?aspro-cols,
@@ -674,7 +684,7 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
 <h2>SearchFFT: off-axis Fringe Tracking and Adaptative Optics for interferometry</h2>
 <p>This tool searches for nearby stars suitable for off-axis Fringe Tracking and off-axis Adaptive Optics.
 <br/>
-You can query one or several Science Targets separated by semicolon by names (resolved using Simbad for proper motion) or by coordinates (RA +/-DEC in degrees J2000). For each of them, suitable solutions will be searched. Only solutions with a valid AO and a valid FT are presented. When several solutions are found, a scoring ( \(strehl_{{SCI}} . exp( -\sigma_{{\phi}}^2 ) . exp( -\sigma_{{iso}}^2 )\) ) and ranking is proposed based on a simplified model of AO (GPAO) and FT (GRAVITY) of VLTI. If the Science Target allows it, the on-axis solution is also presented and ranked.
+You can query one or several Science Targets separated by semicolon by names (resolved using Simbad for proper motion) or by coordinates (RA +/-DEC J2000). For each of them, suitable solutions will be searched. Only solutions with a valid AO and a valid FT are presented. When several solutions are found, a scoring ( \(strehl_{{SCI}} . exp( -\sigma_{{\phi}}^2 ) . exp( -\sigma_{{iso}}^2 )\) ) and ranking is proposed based on a simplified model of AO (GPAO) and FT (GRAVITY) of VLTI. If the Science Target allows it, the on-axis solution is also presented and ranked.
 <br/>
 
 <br/>
@@ -685,7 +695,7 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
         <form method="post" action="bulk.html"> <!-- force action to avoid param duplication on post -->
             <div class="d-flex p-2">
             <div class="input-group">
-                <input type="text" class="form-control" placeholder="Enter your science identifiers or coordinates. Use semicolon as separator, e.g : 0 0; 4.321 6.543; HD123; HD234 " aria-label="Science identifiers (semicolon separator)" id="identifiers" name="identifiers" value="{$identifiers}"/>
+                <input type="text" class="form-control" placeholder="Enter your science identifiers or coordinates. Use semicolon as separator, e.g : 0 0 ; 4.321 -6.543 ; -00:11:22 +33:44:55.66 ; HD123 ; HD234 " aria-label="Science identifiers (semicolon separator)" id="identifiers" name="identifiers" value="{$identifiers}"/>
             </div>
             </div>
             <div class="d-flex p-2"><div class="p-2 justify-content-end"><label class="form-check-label ">Catalogs to query:</label></div>
@@ -1172,7 +1182,7 @@ declare function app:get-ranking($votable, $cat, $max) {
                 return map:entry($science,$pos)
         ))
 
-        let $log := util:log("info", "  done ("||seconds-from-duration(util:system-time()-$start-time)||"s  / "||seconds-from-duration($start-time3 - $start-time2) ||" for webservice) for "|| array:size($scores) || " analysed solutions")
+        let $log := util:log("info", "  done ("||seconds-from-duration(util:system-time()-$start-time)||"s  / "||seconds-from-duration($start-time3 - $start-time2) ||" for webservice) for "|| count($scores?*) || " analysed solutions")
         return
             map{"res":$res, "cat":$cat?cat_name, "error":$error, "query": $internal-match-query, "sciences-idx" : $map-by-sci , "ftaos": $ftaos ,"scores": $scores, "inputs":$inputs, "input-params":$input-params}
 };
