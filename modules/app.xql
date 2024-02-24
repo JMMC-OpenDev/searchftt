@@ -133,7 +133,7 @@ declare variable $app:json-conf :='{
             "mag_g"  : "gaia.phot_g_mean_mag",
             "mag_bp" : "gaia.phot_bp_mean_mag",
             "mag_rp" : "gaia.phot_rp_mean_mag",
-            "detail"      : { "tmass.h_m":"H_mag", "tmass_nb.angular_distance":"tmass_dist", "tmass.designation":"J_2MASS" },
+            "detail"      : { "gaia.phot_rp_mean_mag": "Grp_mag", "tmass.h_m":"H_mag", "tmass_nb.angular_distance":"tmass_dist", "tmass.designation":"J_2MASS" },
             "from_very_slow"  :
                     "gaiadr3.gaia_source_lite as gaia JOIN gaiaedr3.tmass_psc_xsc_best_neighbour AS tmass_nb USING (source_id) JOIN gaiaedr3.tmass_psc_xsc_join AS xjoin ON tmass_nb.original_ext_source_id = xjoin.original_psc_source_id JOIN gaiadr1.tmass_original_valid AS tmass ON xjoin.original_psc_source_id = tmass.designation"
                 ,
@@ -745,7 +745,8 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
 
     let $start-time := util:system-time()
     (: Rebuild the table (and votable) with a summary of what we have in the catalogs :)
-	let $log := util:log("info", "merge main table to show ranked results ("|| count( $bulk-search-map?ranking?scores?* ) || " for " || count($identifiers-map?*) ||" sciences))... ")
+    let $cnt := try{ count( $bulk-search-map?ranking?scores?* ) }catch * { "XX" }
+	let $log := util:log("info", "merge main table to show ranked results ("|| $cnt || " for " || count($identifiers-map?*) ||" sciences))... ")
 
     let $detail_cols := for $e in (array:flatten($app:conf?extended-cols)) return lower-case($e)
 
