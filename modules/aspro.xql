@@ -45,8 +45,9 @@ let $targetInfos := map:merge((
         (: limit science object with the one that have a solution :)
         where count($all-ftaos?*)>0
         (: get distinct fts and aos (this are str_source_ids resolved by targets-maps) :)
-        let $science-fts  := for $ftao in $all-ftaos?* group by $ft := $ftao?*[1] return $ft
-        let $science-aos  := for $ftao in $all-ftaos?* group by $ao := $ftao?*[2] return $ao
+        (: don't consider science as AO or FT or themself waiting for a new SCGroup in Aspro :)
+        let $science-fts  := for $ftao in $all-ftaos?* group by $ft := $ftao?*[1] where not ($science=$ft) return $ft
+        let $science-aos  := for $ftao in $all-ftaos?* group by $ao := $ftao?*[2] where not ($science=$ao) return $ao
         return
             map:entry($science, map{ "ft-ids": $science-fts, "ao-ids": $science-aos})
     ))
