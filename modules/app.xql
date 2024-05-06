@@ -681,7 +681,7 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
     return
     (
     <div>
-<h2>SearchFFT: off-axis Fringe Tracking and Adaptative Optics for interferometry</h2>
+<h2>SearchFTT: off-axis Fringe Tracking and Adaptative Optics for interferometry</h2>
 <p>This tool searches for nearby stars suitable for off-axis Fringe Tracking and off-axis Adaptive Optics.
 <br/>
 You can query one or several Science Targets separated by semicolon by names (resolved using Simbad for proper motion) or by coordinates (RA +/-DEC J2000). For each of them, suitable solutions will be searched. Only solutions with a valid AO and a valid FT are presented. When several solutions are found, a scoring ( \(strehl_{{SCI}} . exp( -\sigma_{{\phi}}^2 ) . exp( -\sigma_{{iso}}^2 )\) ) and ranking is proposed based on a simplified model of AO (GPAO) and FT (GRAVITY) of VLTI. If the Science Target allows it, the on-axis solution is also presented and ranked.
