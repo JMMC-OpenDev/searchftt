@@ -16,6 +16,12 @@
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
   <changelog xmlns="">
+     <change version="1.5.27">
+      <ul>
+        <li>Bugfix to avoid RA/DEC missmatch looking at VizieR tables. Add also an option to use name instead of coord if present.</li>
+        <li></li>
+      </ul>
+    </change>
      <change version="1.5.26">
       <ul>
         <li>Move bulk form as default. Old one is <a href="onebyone.html">still online for some next releases</a>.</li>

@@ -729,7 +729,8 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
             <form method="post" action="modules/viziertable.xql"><div class="d-flex p-2">
             <div class="col-sm-2"><button type="submit" class="btn btn-primary" title="You may request to gather coordinates using a VizieR table name">Use VizieR table <i class="bi bi-question-circle"></i></button></div>
             <div class="col-sm-2"><input type="text" class="form-control" name="viziertable" value="{$viziertable}"/></div>
-            <div class="col-sm-2">&#160; <a href="modules/viziertable.xql?viziertable=J/MNRAS/414/108/stars">(test J/MNRAS/414/108/stars)</a></div>
+            <div class="col-sm-2">&#160;<input class="form-check-input" type="checkbox" name="try-name-first"/><label class="form-check-label">Prefer name over coordinates</label></div>
+            <div class="col-sm-2">&#160; <a href="modules/viziertable.xql?try-name-first=y&amp;viziertable=J/MNRAS/414/108/stars">(test J/MNRAS/414/108/stars)</a></div>
             </div></form>
             </div>
         }

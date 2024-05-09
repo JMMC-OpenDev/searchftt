@@ -37,10 +37,12 @@ return
 declare function local:getNameOrCoordColnames($vizierTableIds as xs:string*){
 let $in := string-join($vizierTableIds!concat("'",normalize-space(.),"'"),",")
 
+
+(: constraints for column on interrest. Lists can be provided ( with decreasing priority order ) :)
 let $constraints := map{
   "ra": map{"unit": "deg", "ucd":('pos.eq.ra;meta.main','pos.eq.ra')}
   ,"dec": map{"unit": "deg", "ucd":('pos.eq.dec;meta.main','pos.eq.dec')}
-  ,"name": map{"datatype":"CHAR","ucd": ('meta.id;meta.main', 'meta.id')} (: CHAR is for VARCHAR, CHAR(20) :)
+  ,"name": map{"datatype":"CHAR","ucd": ('meta.id;meta.main', 'meta.id')} (: CHAR matches VARCHAR, CHAR(XX) :)
 }
 
 (:  get col_names ordered by ucds for every table ids :)
@@ -65,22 +67,31 @@ return
     for $trg in $trs group by $table := ($trg/*:TD)[1]
       return
         map:merge(
-          for $col in map:keys($constraints)
+          for $col in ("ra","dec","name")
             let $col-constraints := $constraints($col)
-            (: keep lines with valid constraints (first list item get higher priority) :)
-            let $valid-trs := map:for-each($col-constraints, function($c, $l){
-              for $e in $l
-                return $trg[*[$colidx($c)]=$e]
-            })
-            let $valid-trs := for $tr in $valid-trs group by $colname:=$tr/*[2]
-              where count($tr)=count(map:size($col-constraints))
-              return $tr[1]
+            let $tr := local:filter($col, $trg, $col-constraints, $colidx)
+            where $tr
             return
-              (: get only the first valid column_name :)
-              map:entry( $col, head( $valid-trs/*[2] ) )
+              map:entry( $col, data( $tr/*[2] ) )
         )
   ))
 };
+
+(:  Loop on every tr until every constraints filters out valid entries. Return first one that match first constraints if list are provided :)
+declare function local:filter($col, $trs, $constraints, $colidx){
+    if (map:size($constraints)=0)
+        then
+            head($trs)
+    else
+        let $keys := map:keys($constraints)
+        let $key := head($keys)
+        let $colid := $colidx($key)
+        let $valid-trs :=
+            for $cvalue in $constraints($key)
+                for $tr in $trs where matches($tr//*:TD[$colid],$cvalue) return $tr
+        return local:filter($col, $valid-trs, map:remove($constraints, $key), $colidx)
+};
+
 
 declare function local:getNamesOrCoords($tableId as xs:string)
 {
@@ -88,10 +99,14 @@ declare function local:getNamesOrCoords($tableId as xs:string)
     let $colinfo := local:getNameOrCoordColnames($tableId)
     (: let $log := util:log("info", "Searching idorcoord cols in '"|| $tableId ||"' with '"||serialize($colinfo,map {"method": "adaptive"})||"'") :)
 
-    let $query := if ( exists($colinfo?name)) then
+
+    let $try-name-first := exists(request:get-parameter("try-name-first",()))
+    let $query := if ( $try-name-first and exists($colinfo?name)) then
           <query>SELECT {$colinfo?name} FROM &quot;{$tableId}&quot;</query>
-        else if (exists($colinfo?ra) and exists($colinfo?dec))  then
+          else if (exists($colinfo?ra) and exists($colinfo?dec))  then
           <query>SELECT {$colinfo?ra}, {$colinfo?dec} FROM &quot;{$tableId}&quot;</query>
+          else if ( exists($colinfo?name)) then
+          <query>SELECT {$colinfo?name} FROM &quot;{$tableId}&quot;</query>
         else ()
 
     return
@@ -110,6 +125,7 @@ declare function local:getNamesOrCoords($tableId as xs:string)
  - redirect for execution
 :)
 let $viziertable := normalize-space(request:get-parameter("viziertable",()))
+
 let $log := util:log("info", "quering VizieR for "|| $viziertable)
 return
     if(empty($viziertable)) then () else
