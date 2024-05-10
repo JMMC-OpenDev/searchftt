@@ -1200,6 +1200,7 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
 
     let $ftao-dist := <text>DISTANCE( POINT( 'ICRS', ft.ra, ft.dec),POINT('ICRS', ao.ra, ao.dec))*3600.0</text>
     let $dist-filter := <text>(({$ftao-dist}) &lt; {2 * $max?dist_as})</text>
+    let $same-science-filter := <text>(ft.science = ao.science)</text>
 
     let $internal-match := string-join((
         "SELECT",
@@ -1213,7 +1214,7 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
         "FROM",
         "  TAP_UPLOAD."||$table-name||" as ft , TAP_UPLOAD."||$table-name||" as ao ",
         "WHERE",
-        "  " || $ft-filters || " AND " || $ao-filters || " AND " || $dist-filter
+        "  " || string-join ( ( $ft-filters, $ao-filters, $dist-filter, $same-science-filter), " AND ")
         ),"&#10;")
 
     return

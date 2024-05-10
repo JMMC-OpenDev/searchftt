@@ -19,7 +19,7 @@
      <change version="1.5.27">
       <ul>
         <li>Bugfix to avoid RA/DEC missmatch looking at VizieR tables. Add also an option to use name instead of coord if present.</li>
-        <li></li>
+        <li>Fix corner cases for closed targets that get common FT or AO.</li>
       </ul>
     </change>
      <change version="1.5.26">
