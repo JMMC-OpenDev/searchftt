@@ -418,8 +418,8 @@ declare %private function app:fake-target($name as xs:string?, $coords as xs:str
             <pmdec>-0.0</pmdec>
             {$additional-info}
         </target>
-    (: :) let $log := util:log("info", "fake-target:")
-    let $log := util:log("info", $fake-target) (: :)
+    (: let $log := util:log("info", "fake-target:")
+    let $log := util:log("info", $fake-target) :)
     return $fake-target
 };
 
