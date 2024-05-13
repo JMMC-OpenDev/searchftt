@@ -8,7 +8,7 @@ import module namespace app="http://exist.jmmc.fr/searchftt/apps/searchftt/templ
 :)
 declare function local:filter-identifiers($inputfile){
     let $lines := for $line in tokenize($inputfile, "&#10;")
-        where not ( ( ("--", "#", "&quot;", "&quot;h:m:s") ! starts-with($line, .) ) = true() )
+        where not ( ( ("--", "#", "&quot;h:m:s") ! starts-with($line, .) ) = true() )
         where string-length(normalize-space($line)) > 1
         return replace($line, "&#9;", " ") ! replace(., "&quot;","")
     let $lines := distinct-values($lines)
