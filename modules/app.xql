@@ -382,7 +382,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
 :)
 declare %private function app:fake-target($name as xs:string?, $coords as xs:string?,$votable-tr as node()?, $colidx as map(*)?) {
     let $name := if($name) then $name else normalize-space($coords)
-    let $coord := $coords => replace( "\+", " +") => replace ("\-", " -")
+    let $coord := $coords => replace( "\+", " +") => replace ("\-", " -") => replace ("&#9;", " ")
     let $t := for $e in tokenize($coord, " ")[string-length(.)>0]  return $e
     let $t := try{
             if(matches($coords, ":")) then (astro:from-hms($t[1]), astro:from-dms($t[2])) else $t
@@ -418,8 +418,8 @@ declare %private function app:fake-target($name as xs:string?, $coords as xs:str
             <pmdec>-0.0</pmdec>
             {$additional-info}
         </target>
-    (: let $log := util:log("info", "fake-target:")
-    let $log := util:log("info", $fake-target) :)
+    (: :) let $log := util:log("info", "fake-target:")
+    let $log := util:log("info", $fake-target) (: :)
     return $fake-target
 };
 
@@ -455,6 +455,7 @@ declare function app:resolve-by-names($name-or-coords) {
         else
             jmmc-simbad:resolve-by-names($names)
     ))
+    let $log := util:log("info", $map)
     return $map
 };
 
@@ -915,7 +916,7 @@ declare function app:searchftt-bulk-list($identifiers as xs:string*, $catalogs-t
     let $catalogs-to-query := if(exists($catalogs-to-query)) then $catalogs-to-query else $config?preferred?bulk_catalog
 
     (: Cleanup requested ids and get Simbad or basic informations for each of them :)
-    let $ids := distinct-values($identifiers ! tokenize(., ";") ! tokenize(., "&#9;") ! normalize-space(.))[string-length()>0]
+    let $ids := distinct-values($identifiers ! tokenize(., ";") ! normalize-space(.))[string-length()>0]
     let $identifiers-map := app:resolve-by-names($ids)
 
     let $catalogs := map:merge((
@@ -967,32 +968,42 @@ declare function app:bulk-search($identifiers-map, $cat) {
     let $query-code := <div class="extquery d-none">{for $q in $query return <pre><br/>{data($q)}<br/></pre>}</div>
 
     let $votables := for $input-votable at $pos in $input-votables[1] (: TODO remove [1] to enable batch approach and see next TODO too :)
-           	let $log := util:log("info", " subquery "|| $pos)
-
-            let $max-rec := $max?rec * count($input-votable//*:TR) * 100 (: TODO show this magic value in doc :)
-            let $votable :=
-                try{
-                    if(exists(request:get-parameter("dry", ())))
-                    then
-                        <error>dry run : remote query SKIPPED !</error>
-                    else if( $input-targets-count = 0 )
-                    then
-                        <error>Cannot find any coordinates from your input list.</error>
+        let $max-rec := $max?rec * count($input-votable//*:TR) * 100 (: TODO show this magic value in doc :)
+        let $votable :=
+            try{
+                if(exists(request:get-parameter("dry", ())))
+                then
+                    <error>dry run : remote query SKIPPED !</error>
+                else if( $input-targets-count = 0 )
+                then
+                    <error>Cannot find any coordinates from your input list.</error>
+                else
+                    if (count($query)=1) then
+                        jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $input-votable, $max-rec, $cat?tap_format)
                     else
-                        if (count($query)=1) then
-                            jmmc-tap:tap-adql-query($cat?tap_endpoint,$query, $input-votable, $max-rec, $cat?tap_format)
-                        else
-                            let $input-votable2 := jmmc-tap:tap-adql-query($cat?tap_endpoint,$query[1], $input-votable, $max-rec*10000, $cat?tap_format)
-                            return
-                                if( $input-votable2/error or $input-votable2//*:INFO[@name="QUERY_STATUS" and @value="ERROR"] )
-                                then
-                                    $input-votable2
-                                else
+                        let $log := util:log("info", "query 1 for  subquery "|| $pos)
+                        let $input-votable2 := try {
+                                jmmc-tap:tap-adql-query($cat?tap_endpoint,$query[1], $input-votable, $max-rec*10000, $cat?tap_format)
+                            }catch * {
+                                (: retry on error to avoid non expected 401 from ESAC :)
+                                util:log("info", "we go an error (" || $err:description || "), wait 1 s and retry ...")
+                                ,util:wait(1000)
+                                ,util:log("error", $err:value)
+                                ,jmmc-tap:tap-adql-query($cat?tap_endpoint,$query[1], $input-votable, $max-rec*10000, $cat?tap_format)
+                            }
+
+                        return
+                            if( $input-votable2/error or $input-votable2//*:INFO[@name="QUERY_STATUS" and @value="ERROR"] )
+                            then
+                                $input-votable2
+                            else
+                                let $log := util:log("info", "query 2 for  subquery "|| $pos)
+                                return
                                     jmmc-tap:tap-adql-query($cat?tap_endpoint,$query[2], $input-votable2, $max-rec, $cat?tap_format, "step2")
-                } catch * {
-                    <a><error>{$err:description}</error>{$err:value}</a>
-                }
-            return $votable
+            } catch * {
+                <a><error>{$err:description}</error>{$err:value}</a>
+            }
+        return $votable
     (: TODO merge votables :)
     let $votable := $votables[1]
 
@@ -1002,7 +1013,7 @@ declare function app:bulk-search($identifiers-map, $cat) {
                 <div class="alert alert-danger" role="alert">
                     Error trying to query remote catalog <em>{$cat?cat_name}</em>:<br/>
                     <pre>{data($votable)}</pre>
-                    {util:log("error", data($votable))}
+                    {util:log("error", $votable)}
                 </div>
             )
         else if(not ( contains(lower-case(name($votable/*)),"votable") ) ) (: TODO throw an exception for this case on jmmc-tap side :)
