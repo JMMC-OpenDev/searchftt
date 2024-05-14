@@ -696,7 +696,7 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
         <form method="post" action="bulk.html"> <!-- force action to avoid param duplication on post -->
             <div class="d-flex p-2">
             <div class="input-group">
-                <input type="text" class="form-control" placeholder="Enter your science identifiers or coordinates. Use semicolon as separator, e.g : 0 0 ; 4.321 -6.543 ; -00:11:22 +33:44:55.66 ; HD123 ; HD234 " aria-label="Science identifiers (semicolon separator)" id="identifiers" name="identifiers" value="{$identifiers}"/>
+                <input title="You may drag and drop a multiline list in this field" type="text" class="form-control" placeholder="Enter your science identifiers or coordinates. Use semicolon as separator, e.g : 0 0 ; 4.321 -6.543 ; -00:11:22 +33:44:55.66 ; HD123 ; HD234 " aria-label="Science identifiers (semicolon separator)" id="identifiers" name="identifiers" value="{$identifiers}"/>
             </div>
             </div>
             <div class="d-flex p-2"><div class="p-2 justify-content-end"><label class="form-check-label ">Catalogs to query:</label></div>
@@ -719,6 +719,13 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
                 else ()
             }
         </form>
+        <script>
+            document.querySelector('#identifiers').addEventListener('input', function (event) {{
+                if(event.inputType=="insertFromDrop"){{
+                    event.srcElement.value=event.data.replace(/[\r\n]+/g, " ; ");
+                }}
+            }});
+        </script>
         {
             if (exists($identifiers[string-length()>0]) )  then () else
             <div>
