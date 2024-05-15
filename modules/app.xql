@@ -713,8 +713,7 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
                 if (exists($identifiers[string-length()>0])) then
                     (
                         app:searchftt-bulk-list-html($identifiers, $max, $catalogs),
-                        <code class="extdebug d-none"><br/>Request processing duration : {seconds-from-duration(util:system-time()-$start-time)}s</code>,
-                        <p><i class="bi bi-info-circle-fill"></i>&#160;<kbd>Shift</kbd> click in the column order buttons to combine a multi column sorting.</p>
+                        <code class="extdebug d-none"><br/>Request processing duration : {seconds-from-duration(util:system-time()-$start-time)}s</code>
                     )
                 else ()
             }
@@ -845,7 +844,9 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
 
     let $log := util:log("info", "done ("||seconds-from-duration(util:system-time()-$start-time)||"s)")
 
-    let $targets :=<div><h3>{ count(map:for-each($trs, function($k,$v){if(exists($v)) then $k else ()})) } targets with both FT and AO solutions
+    let $nb-results := count(map:for-each($trs, function($k,$v){if(exists($v)) then $k else ()}))
+
+    let $targets :=<div><h3>{ $nb-results } targets with both FT and AO solutions
         <a class="btn btn-outline-secondary btn-sm" href="data:application/x-votable+xml;base64,{util:base64-encode(serialize($votable))}" type="application/x-votable+xml" download="input_{app:getFileSuffix($identifiers)}.vot">votable</a>&#160;
         {(:)
             for $cat-name in map:keys($bulk-search-map?catalogs)
@@ -861,31 +862,38 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
 :)
         }
         {$error-report}
-        {$table}
-
-        <div class="p-2 d-flex">
-            <div class="p-2 justify-content-end">Limit to :</div>
-            <div class="p-2"><div class="input-group"><span class="input-group-text" title="1= best performance, 0= worst performance">Min score of solutions <i class="bi bi-question-circle"></i></span><input type="text" id="min_score" name="min_score" value="{$config?min?score}"/></div></div>
-            <div class="p-2"><div class="input-group"><span class="input-group-text" title="this is the rank">Max number solutions per science <i class="bi bi-question-circle"></i></span><input type="text" id="max_rank" name="max_rank" value="{$max?rank}"/></div></div>
-        </div>
-        <div class="p-2 d-flex">
-            <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/aspro.xql">Get my ASPRO2 file 🤩</button></div>
-            <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/outputfile.xql">Get as SearchFTT input file</button></div>
-            <!-- <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/test.xql">Test this list</button></div> -->
-        </div>
+        {if ($nb-results = 0) then () else (
+            $table
+            ,<div class="p-2 d-flex">
+                <div class="p-2 justify-content-end">Limit to :</div>
+                <div class="p-2"><div class="input-group"><span class="input-group-text" title="1= best performance, 0= worst performance">Min score of solutions <i class="bi bi-question-circle"></i></span><input type="text" id="min_score" name="min_score" value="{$config?min?score}"/></div></div>
+                <div class="p-2"><div class="input-group"><span class="input-group-text" title="this is the rank">Max number solutions per science <i class="bi bi-question-circle"></i></span><input type="text" id="max_rank" name="max_rank" value="{$max?rank}"/></div></div>
+            </div>
+            ,<div class="p-2 d-flex">
+                <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/aspro.xql">Get my ASPRO2 file 🤩</button></div>
+                <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/outputfile.xql">Get as SearchFTT input file</button></div>
+                <!-- <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/test.xql">Test this list</button></div> -->
+            </div>
+            ,<p><i class="bi bi-info-circle-fill"></i>&#160;<kbd>Shift</kbd> click in the column order buttons to combine a multi column sorting.</p>
+        )}
         <div class="extquery d-none">{for $q in $bulk-search-map?catalogs?*?ranking?query return <pre><br/>{data($q)}<br/></pre>}</div>
+
     </div>
 
-    return
-        ($targets
-        ,<br/>,<hr/>,<em>Next debug content will be improved if not removed...</em>,<hr/>,<br/>
+    let $debug-info := if (empty($bulk-search-map?catalogs?*?html) ) then () else
+        (<br/>,<hr/>,
+        <em>Next debug content will be improved if not removed...</em>,<br/>
         ,<h2>Raw results from catalogs.</h2>
         ,<p>By now, the ut_flag and at_flag columns are not computed in the votable but the table below ( 1=FT, 2=AO, 3=FT or AO). <br/> Magnitudes columns colors are for
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-success bg-opacity-10 border border-success border-opacity-10 rounded-2">UT and AT compliancy</small>,
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-warning bg-opacity-10 border border-warning border-opacity-10 rounded-2">UT compliancy</small> or
             <small class="d-inline-flex mb-3 px-2 py-1 fw-semibold bg-danger bg-opacity-10 border border-danger border-opacity-10 rounded-2">not compatible / unknown</small>
         </p>
-        , $bulk-search-map?catalogs?*?html
+        , $bulk-search-map?catalogs?*?html)
+
+    return
+        ($targets
+        ,$debug-info
         ,app:datatable-script(index-of($cols, "Score"),index-of($cols, "Rank"),index-of($cols, "sci_ft_dist"),index-of($cols, "sci_ao_dist"))
         )
 };
