@@ -18,8 +18,12 @@
   <changelog xmlns="">
      <change version="1.5.27">
       <ul>
-        <li>Bugfix to avoid RA/DEC missmatch looking at VizieR tables. Add also an option to use name instead of coord if present.</li>
-        <li>Fix corner cases for closed targets that get common FT or AO.</li>
+        <li>Bugfix to avoid RA/DEC missmatch looking at VizieR tables. Add also a checkbox to try to use a name instead of coords if present.</li>
+        <li>Retry on error since ESA GAIA request often fails with 401 error.</li>
+        <li>Fix corner cases for closed targets that get common FT or AO stars.</li>
+        <li>Improve file input method: accept tabs in HMS DMS, ignore lines starting with # or --, remove quotes.</li>
+        <li>Accept drag and drop onto the identifiers textfield (linebreaks automatically are replaced by the ; separator ).</li>
+        <li>Fix typos : SearchFFT -&gt; SearchFTT ; declinaison -&gt; declination.</li>
       </ul>
     </change>
      <change version="1.5.26">
@@ -33,7 +37,7 @@
         <li>Refactor bulk mode code to support big catalog queries in two steps (position followed by magnitudes constraints).Timeouts still occurs on GAIA for more than ~500 identifiers. Please contact use to get a batch recipe!</li>
         <li>Resolve names in batch mode for huge speedup on long target lists.</li>
         <li>Format decimal values (3 digits) in result tables. Use <a href="https://bottosson.github.io/posts/oklab/">oklab color space</a> with <a href="https://culorijs.org/">culori library</a> to color scores and distances values.</li>
-        <li>Add a max_declinaison limit, default to 40° for VLTI case. User can override the value with max_declinaison parameter e.g: <a href="index.html?max_dist_as=40&amp;max_magK_UT=12&amp;max_magK_AT=11&amp;max_magV=16&amp;max_magR=13.5&amp;max_declinaison=90">full sky query</a></li>
+        <li>Add a max_declination limit, default to 40° for VLTI case. User can override the value with max_declination parameter e.g: <a href="index.html?max_dist_as=40&amp;max_magK_UT=12&amp;max_magK_AT=11&amp;max_magV=16&amp;max_magR=13.5&amp;max_declination=90">full sky query</a></li>
         <li>Enable output table functions:<ul><li>search</li><li>add export to clipboard or CSV buttons</li><li>column selection</li></ul></li>
       </ul>
     </change>

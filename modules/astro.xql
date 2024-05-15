@@ -77,3 +77,20 @@ function astro:from-dms($decDms as xs:string) as xs:double {
     let $dec := $hh + $sign * ( $hm div 60.0 + $hs div 3600.0 )
     return $dec
 };
+
+
+declare function astro:toHMS($degrees as xs:double) as xs:string {
+  let $hours := floor($degrees)
+  let $minutes := floor(($degrees - $hours) * 60)
+  let $seconds := (($degrees - $hours) * 3600) mod 60
+  return string-join(($hours, $minutes, $seconds),":")
+};
+
+declare function astro:toDMS($degrees as xs:double) as xs:string {
+  let $degrees-abs := abs($degrees)
+  let $degrees-part := floor($degrees-abs)
+  let $minutes-part := floor(($degrees-abs - $degrees-part) * 60)
+  let $seconds-part := (($degrees-abs - $degrees-part) * 3600) mod 60
+  let $sign := if ($degrees >= 0) then "+" else "-"
+  return string-join(($sign||$degrees-part, $minutes-part, $seconds-part),":")
+};

@@ -52,7 +52,7 @@ declare variable $app:json-conf :='{
         "max_FT_mag": 12,
 
         "max_dist_as" : 30,
-        "max_declinaison" : 40,
+        "max_declination" : 40,
         "max_rec" : 25,
         "max_result_table_rows" : 1000,
         "max_rank" : 4,
@@ -341,7 +341,7 @@ declare %templates:wrap function app:form($node as node(), $model as map(*), $id
                 <li>Main catalogs<ul>{ for $cat in $app:conf?catalogs?* where $cat?main_cat return <li><b>{$cat?cat_name}</b>&#160;{parse-xml("<span>"||$cat?description||"</span>")}</li>}</ul></li>
                 {if ( false() = $app:conf?catalogs?*?main_cat ) then <li>Additionnal catalogs (use toggle button in the menu to get result tables)<ul>{ for $cat in $app:conf?catalogs?* where not($cat?main_cat) return <li><b>{$cat?cat_name}</b>&#160;{parse-xml("<span>"||$cat?description||"</span>")}</li>}</ul></li> else ()}
             </ul>
-            Each query is performed within {$max?dist_as_info}&apos;&apos; of the Science Target below the max declinaison of {$max?declinaison_info}°.
+            Each query is performed within {$max?dist_as_info}&apos;&apos; of the Science Target below the max declination of {$max?declination_info}°.
             A magnitude filter is applied on every Fringe Tracker Targets according to the best limits offered in P110
             for <b>UT (MACAO) OR AT (NAOMI)</b>  respectively <b>( K &lt; {$max?magK_UT_info} AND V &lt; {$max?magV_info} ) OR ( K &lt; {$max?magK_AT_info} AND R&lt;{$max?magR_info} )</b>.
             When missing, the V and R magnitudes are computed from the Gaia G, Grb and Grp magnitudes.
@@ -657,7 +657,7 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
     (: was here before max-mags to convey mags parameters
         let $params :=  for $p in request:get-parameter-names() where not ( $p=("identifiers", "catalogs") ) return <input type="hidden" name="{$p}" value="{request:get-parameter($p,' ')}"/> :)
 
-    let $max-inputs :=  for $k in ("FT_mag","AO_mag", "declinaison") let $v := map:get($max,$k) return
+    let $max-inputs :=  for $k in ("FT_mag","AO_mag", "declination") let $v := map:get($max,$k) return
         <div class="p-2"><div class="input-group">
                 <span class="input-group-text">
                 {
@@ -691,7 +691,7 @@ You can query one or several Science Targets separated by semicolon by names (re
 <br/>
 For the time being, only the NGS mode of GPAO is supported by the scoring. However, solutions can be found for the LGS mode by increasing the AO magnitude (but with wrong scoring and ranking).
 <br/>
-SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers. Each query is performed within a search radius around the Science Target below a max declinaison. A magnitude filter is applied to define candidates for the FT (infrared) and for the AO (visible). Only solutions with a valid AO and a valid FT are presented in the main output table. For debug or further investigations, the list of all individual candidates can be found in the extended raw result.
+SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers. Each query is performed within a search radius around the Science Target below a max declination. A magnitude filter is applied to define candidates for the FT (infrared) and for the AO (visible). Only solutions with a valid AO and a valid FT are presented in the main output table. For debug or further investigations, the list of all individual candidates can be found in the extended raw result.
 </p>
         <form method="post" action="bulk.html"> <!-- force action to avoid param duplication on post -->
             <div class="d-flex p-2">
@@ -1336,7 +1336,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     (: cross match must be done in the catalog epoch to retrieve candidates without PM :)
     (: /!\ VizieR will never end the processing if we do not put the input position in the POINT :)
     let $positional-xmatch := <position>CONTAINS( POINT('ICRS', {$cat?ra}, {$cat?dec}), CIRCLE('ICRS', {$ra_in_cat}, {$dec_in_cat}, {$max?dist_as}/3600.0) ) = 1</position>
-    let $max_dec := <position>{$cat?dec} &lt; {$max?declinaison}</position>
+    let $max_dec := <position>{$cat?dec} &lt; {$max?declination}</position>
     let $comments := string-join((""), "&#10;")
 
     (: TODO
