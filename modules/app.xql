@@ -752,7 +752,7 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
 
 declare function app:simbad-link($id as xs:string, $target, $ra as xs:string?, $dec as xs:string?){
     if (exists($target/ra/text()) and empty($target/@fake-target) ) then
-        <a title="{$target/user_identifier} ( {$ra} {$dec} )" href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}" target="_blank">{replace($target/name," ","&#160;")}&#160;<i class="bi bi-arrow-up-right-square"></i></a>
+        <a title="{$target/user_identifier} ( RA/DEC {$target/ra} {$target/dec} )" href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident={encode-for-uri($id)}" target="_blank">{replace($target/name," ","&#160;")}&#160;<i class="bi bi-arrow-up-right-square"></i></a>
     else if (exists($ra) and exists($dec) ) then
         <span>{replace($id," ","&#160;")}<a href="http://simbad.u-strasbg.fr/simbad/sim-coo?Coord={$ra}+{$dec}&amp;CooEpoch=2000&amp;CooEqui=2000&amp;Radius={$app:conf?samestar-dist_as}&amp;Radius.unit=arcsec" title="Using coords ( {$ra} {$dec} ) because Simbad does't know : {$id}" target="_blank">&#160;<i class="bi bi-arrow-up-right-square"></i></a></span>
     else if (exists($target/ra/text()) and exists($target/dec/text()) ) then
