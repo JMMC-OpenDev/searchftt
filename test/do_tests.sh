@@ -18,4 +18,4 @@ do
   fi
 done
 
-mv outs outs.$(date -Is)
+mv -v outs outs.$(date -Is)
