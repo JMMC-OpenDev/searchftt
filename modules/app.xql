@@ -719,9 +719,14 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
             }
         </form>
         <script>
-            document.querySelector('#identifiers').addEventListener('input', function (event) {{
+            document.querySelector('#identifiers').addEventListener('beforeinput', function (event) {{
+                // console.log(event);
                 if(event.inputType=="insertFromDrop"){{
-                    event.srcElement.value=event.data.replace(/[\r\n]+/g, " ; ");
+                    if (event.data) {{
+                        // console.log("dropped with content !!");
+                        event.srcElement.value=event.data.replace(/[\r\n]+/g, " ; ");
+                        event.preventDefault();
+                    }}
                 }}
             }});
         </script>
