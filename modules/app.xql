@@ -740,7 +740,7 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
             if (exists($identifiers[string-length()>0]) )  then () else
             <div>
             <form method="post" enctype="multipart/form-data" action="modules/inputfile.xql"><div class="d-flex p-2">
-            <div class="col-sm-2"><button type="submit" class="btn btn-primary" title="You may submit an input file with one id or coordinate (RA +/-DEC in degrees J2000) per line ">Submit my file<i class="bi bi-question-circle"></i></button></div>
+            <div class="col-sm-2"><button type="submit" class="btn btn-primary" title="You may submit an input file with one id or coordinate (RA +/-DEC in degrees J2000) per line ">Submit my list file<i class="bi bi-question-circle"></i></button></div>
             <div class="col-sm-2"><input type="file" class="form-control" name="inputfile"/></div>
             <div class="col-sm-2">&#160; <a href="test/inputs/test1.csv">(see sample file)</a></div>
             </div></form>
@@ -881,8 +881,8 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
                 <div class="p-2"><div class="input-group"><span class="input-group-text" title="this is the rank">Max number solutions per science <i class="bi bi-question-circle"></i></span><input type="text" id="max_rank" name="max_rank" value="{$max?rank}"/></div></div>
             </div>
             ,<div class="p-2 d-flex">
-                <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/aspro.xql">Get my ASPRO2 file 🤩</button></div>
-                <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/outputfile.xql">Get as SearchFTT input file</button></div>
+                <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/aspro.xql">Get as an ASPRO2 file</button></div>
+                <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/outputfile.xql">Get as a SearchFTT list file</button></div>
                 <!-- <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/test.xql">Test this list</button></div> -->
             </div>
             ,<p><i class="bi bi-info-circle-fill"></i>&#160;<kbd>Shift</kbd> click in the column order buttons to combine a multi column sorting.</p>
