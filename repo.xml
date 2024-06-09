@@ -16,13 +16,19 @@
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
   <changelog xmlns="">
-     <change version="1.5.27">
+    <change version="1.5.28">
+      <ul>
+        <li>Accept Copy and Paste onto the identifiers textfield ( linebreaks automatically are replaced by the ; separator ).</li>
+        <li>Change some button labels.</li>
+      </ul>
+    </change>
+    <change version="1.5.27">
       <ul>
         <li>Bugfix to avoid RA/DEC missmatch looking at VizieR tables. Add also a checkbox to try to use a name instead of coords if present.</li>
         <li>Retry on error since ESA GAIA request often fails with 401 error.</li>
         <li>Fix corner cases for closed targets that get common FT or AO stars.</li>
         <li>Improve file input method: accept tabs in HMS DMS, ignore lines starting with # or --, remove quotes.</li>
-        <li>Accept drag and drop onto the identifiers textfield (linebreaks automatically are replaced by the ; separator ).</li>
+        <li>Accept drag and drop onto the identifiers textfield ( linebreaks automatically are replaced by the ; separator ).</li>
         <li>Fix typos : SearchFFT -&gt; SearchFTT ; declinaison -&gt; declination.</li>
       </ul>
     </change>
