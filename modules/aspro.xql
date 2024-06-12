@@ -60,10 +60,7 @@ let $all-identifiers := distinct-values( ( map:keys($targetInfos), $fts-ids, $ao
 let $targets-map := map:merge(($res?catalogs?*?targets-map, $res?identifiers-map)) (: last given map has the highest priority in this implementation :)
 let $aspro-cols := $app:conf?aspro-cols
 
-(:let $log := util:log("info","targets")
-let $log := util:log("info",$targets-map):)
-
-(: Ask for download using proper header :)
+(: Ask for download using proper header and a suffix in filename :)
 let $headers := response:set-header("Content-Disposition",' attachment; filename="SearchFTT_'|| app:getFileSuffix($identifiers) ||'.asprox"')
 
 return
@@ -101,11 +98,8 @@ return
         -->}
     </instrumentConfiguration>
     {
-        (:for $identifier in $all-identifiers
-            let $target-id := app:genTargetIds($identifier)
-            let $target := $targets-map($identifier) :)
-
         for $targets in $targets-map?* group by $name := $targets/name/text()
+            where $name=$all-identifiers
             let $target-id := app:genTargetIds($name)
             return
                 let $target := $targets[1] return
