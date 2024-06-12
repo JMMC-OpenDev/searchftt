@@ -56,9 +56,9 @@ declare variable $app:json-conf :='{
         "max_rec" : 25,
         "max_result_table_rows" : 1000,
         "max_rank" : 4,
-        "max_rankbulk_doc" : "max number of best AOFT tuples sorted by score",
-
+        "max_rank_doc" : "max number of best AOFT tuples sorted by score. This is the rank",
         "min_score" : 0.0,
+        "min_score_doc" : "1= best performance, 0= worst performance",
 
         "preferred_bulk_catalog" : "Gaia DR3",
         "max_rows_from_vizier" : 500
@@ -877,8 +877,8 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
             $table
             ,<div class="p-2 d-flex">
                 <div class="p-2 justify-content-end">Limit to :</div>
-                <div class="p-2"><div class="input-group"><span class="input-group-text" title="1= best performance, 0= worst performance">Min score of solutions <i class="bi bi-question-circle"></i></span><input type="text" id="min_score" name="min_score" value="{$config?min?score}"/></div></div>
-                <div class="p-2"><div class="input-group"><span class="input-group-text" title="this is the rank">Max number solutions per science <i class="bi bi-question-circle"></i></span><input type="text" id="max_rank" name="max_rank" value="{$max?rank}"/></div></div>
+                <div class="p-2"><div class="input-group"><span class="input-group-text" title="{$config?min?score_doc}">Min score of solutions <i class="bi bi-question-circle"></i></span><input type="text" id="min_score" name="min_score" value="{$config?min?score}"/></div></div>
+                <div class="p-2"><div class="input-group"><span class="input-group-text" title="{$max?rank_doc}">Max number solutions per science <i class="bi bi-question-circle"></i></span><input type="text" id="max_rank" name="max_rank" value="{$max?rank}"/></div></div>
             </div>
             ,<div class="p-2 d-flex">
                 <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/aspro.xql">Get as an ASPRO2 file</button></div>
