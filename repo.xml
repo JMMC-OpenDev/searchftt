@@ -8,7 +8,7 @@
   <author>Anthony Berdeu</author>
   <author>Jean-Philippe Berger</author>
   <website>https://searchftt.jmmc.fr</website>
-  <status>stable</status><!-- stable/beta/alpha -->
+  <status>beta</status><!-- stable/beta/alpha -->
   <license>AGPL-3.0</license>
   <copyright>true</copyright>
   <type>application</type>
@@ -16,10 +16,15 @@
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
   <changelog xmlns="">
+    <change version="1.5.29">
+      <ul>
+        <li>Accept Copy and Paste onto the identifiers textfield ( linebreaks automatically are replaced by the ; separator ).</li>
+        <li>Update description (collapsable part) and change some labels.</li>
+      </ul>
+    </change>
     <change version="1.5.28">
       <ul>
         <li>Accept Copy and Paste onto the identifiers textfield ( linebreaks automatically are replaced by the ; separator ).</li>
-        <li>Change some button labels.</li>
       </ul>
     </change>
     <change version="1.5.27">
