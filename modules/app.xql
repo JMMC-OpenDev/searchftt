@@ -682,17 +682,35 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
     return
     (
     <div>
-<h2>SearchFTT: off-axis Fringe Tracking and Adaptative Optics for interferometry</h2>
-<p>This tool searches for nearby stars suitable for off-axis Fringe Tracking and off-axis Adaptive Optics.
-<br/>
-You can query one or several Science Targets separated by semicolon by names (resolved using Simbad for proper motion) or by coordinates (RA +/-DEC J2000). For each of them, suitable solutions will be searched. Only solutions with a valid AO and a valid FT are presented. When several solutions are found, a scoring ( \(strehl_{{SCI}} . exp( -\sigma_{{\phi}}^2 ) . exp( -\sigma_{{iso}}^2 )\) ) and ranking is proposed based on a simplified model of AO (GPAO) and FT (GRAVITY) of VLTI. If the Science Target allows it, the on-axis solution is also presented and ranked.
-<br/>
 
-<br/>
-For the time being, only the NGS mode of GPAO is supported by the scoring. However, solutions can be found for the LGS mode by increasing the AO magnitude (but with wrong scoring and ranking).
-<br/>
-SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers. Each query is performed within a search radius around the Science Target below a max declination. A magnitude filter is applied to define candidates for the FT (infrared) and for the AO (visible). Only solutions with a valid AO and a valid FT are presented in the main output table. For debug or further investigations, the list of all individual candidates can be found in the extended raw result.
-</p>
+        <h2>Search Fringe Tracking Targets and Adaptative Optics stars for interferometry</h2>
+        <p><b>SearchFTT</b> searches for nearby stars of your Science Target(s) suitable for off-axis Fringe Tracking (FT) and off-axis Adaptive Optics (AO). <a class="btn btn-primary" data-bs-toggle="collapse" href="#collapseIntro" role="button" aria-expanded="false" aria-controls="collapseIntro">...</a>
+        </p>
+        <div class="collapse" id="collapseIntro">
+        <p>The query can be made in different ways:</p>
+        <ul>
+            <li>enter your Science Target by name (resolved using Simbad for proper motion) or by coordinates (RA ±DEC J2000). For  several Science Targets, the names or the coordinates are separated by semicolons.</li>
+            <li>upload a CSV file with an identifier (name or coordinates) per line.</li>
+            <li>fill a VizieR table code with the option of try selecting names instead of coordinates.</li>
+        </ul>
+        <p>Each query is performed using SIMBAD or/and Gaia DR3 catalogues, which are cross-matched though CDS and ESA data centers. The search angular radius around each Science Target is compatible with a given maximal declination. A magnitude filter is applied to satisfy flux constraints for the near-infrared FT and for the visible AO. The query results following these constraints are presented in a main output table.</p><p>A “Score” is proposed for each pair (FT, AO) of candidates. The score is proportional to the Strehl ratio given by the AO correction, the proportionality coefficient depending on the expected fringe tracking performances given the FT candidate [<a href="#ref1">ref1</a>].
+        <br/> In the Natural Guide Star mode (NGS), the Strehl ratio is estimated  from an analytical model of GPAO [<a href="#ref2">ref2</a>]. So, in this AO mode, a score ranking is possible.<br/>
+        Solutions can however be found in the AO Laser Guide Star mode (LGS) by reducing the AO magnitude to be entered but without a valid score provided, which prevents any score ranking.</p><p>If the Science Target follows the constraints on magnitude and can be itself the (FT, AO) candidates, this on-axis solution is also estimated and ranked.</p>
+        <p>You can save the query results by making an asprox-file, to see on Aspro2 the Science Targets with their FT and AO stars. Aspro2 will help the user to verify the feasibility of the observations in term of visibility level or correlated magnitude when using on-axis fringe tracking.</p>
+        <p>You can also save the list of identifiers which have some candidates in a CSV file.</p>
+
+        <ul>
+            <li id="ref1">[ref1]: T.Shimizu, in prep.</li>
+            <li id="ref2">[ref2]: Berdeu et al., <a href="https://www.jmmc.fr/doc/approved/JMMC-POS-2910-0001.pdf" target="_blank" rel="noopener">Simplified model(s) of the GRAVITY+ adaptive optics system(s) for performance prediction.</a></li>
+            </ul>
+        <p>Acknowledgement<br/>
+            If this software was helpful in your research, please use this acknowledgement and give the access link.<br/><code>
+            This research has made use of the Jean-Marie Mariotti Center \texttt{{SearchFTT}} service.<br/>
+            \footnote{{Available at <a href="https://searchftt.jmmc.fr" target="_blank" rel="noopener">https://searchftt.jmmc.fr</a>}}
+            </code>
+        </p>
+        </div>
+
         <form method="post" action="bulk.html"> <!-- force action to avoid param duplication on post -->
             <div class="d-flex p-2">
             <div class="input-group">
@@ -706,7 +724,7 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
                 {$max-inputs}
             </div>
             <div class="d-flex p-2">
-                <div class="col-sm-2"><input type="submit" class="btn btn-primary" value="Submit my identifiers"/></div>
+                <div class="col-sm-8"><input type="submit" class="btn btn-primary" value="Submit my identifiers"/></div>
                 <div class="col-sm-2"><a href="bulk.html" class="btn btn-outline-secondary" role="button"> Reset <i class="bi bi-arrow-clockwise"></i></a></div>
             </div>
             {
@@ -739,16 +757,18 @@ SIMBAD and Gaia DR3 catalogues are cross-matched though CDS and ESA data centers
         {
             if (exists($identifiers[string-length()>0]) )  then () else
             <div>
-            <form method="post" enctype="multipart/form-data" action="modules/inputfile.xql"><div class="d-flex p-2">
-            <div class="col-sm-2"><button type="submit" class="btn btn-primary" title="You may submit an input file with one id or coordinate (RA +/-DEC in degrees J2000) per line ">Submit my list file<i class="bi bi-question-circle"></i></button></div>
+            <form method="post" enctype="multipart/form-data" action="modules/inputfile.xql">
+            <div class="d-flex p-2">or <br/></div>
+            <div class="d-flex p-2">
+            <div class="col-sm-3"><button type="submit" class="btn btn-primary" title="You may submit an input file with one id or coordinate (RA +/-DEC in degrees J2000) per line ">Submit my SearchFTT.csv file<i class="bi bi-question-circle"></i></button></div>
             <div class="col-sm-2"><input type="file" class="form-control" name="inputfile"/></div>
             <div class="col-sm-2">&#160; <a href="test/inputs/test1.csv">(see sample file)</a></div>
             </div></form>
             <form method="post" action="modules/viziertable.xql"><div class="d-flex p-2">
-            <div class="col-sm-2"><button type="submit" class="btn btn-primary" title="You may request to gather coordinates using a VizieR table name">Use VizieR table <i class="bi bi-question-circle"></i></button></div>
+            <div class="col-sm-3"><button type="submit" class="btn btn-primary" title="You may request to gather coordinates using a VizieR table name">Use VizieR table <i class="bi bi-question-circle"></i></button></div>
             <div class="col-sm-2"><input type="text" class="form-control" name="viziertable" value="{$viziertable}"/></div>
-            <div class="col-sm-2">&#160;<input class="form-check-input" type="checkbox" name="try-name-first"/><label class="form-check-label">Prefer name over coordinates</label></div>
-            <div class="col-sm-2">&#160; <a href="modules/viziertable.xql?try-name-first=y&amp;viziertable=J/MNRAS/414/108/stars">(test J/MNRAS/414/108/stars)</a></div>
+            <div class="col-sm-3">&#160;<input class="form-check-input" type="checkbox" name="try-name-first"/><label class="form-check-label">Prefer name over coordinates</label></div>
+            <div class="col-sm-3">&#160; <a href="modules/viziertable.xql?try-name-first=y&amp;viziertable=J/MNRAS/414/108/stars">(test J/MNRAS/414/108/stars)</a></div>
             </div></form>
             </div>
         }
@@ -881,8 +901,8 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
                 <div class="p-2"><div class="input-group"><span class="input-group-text" title="{$max?rank_doc}">Max number solutions per science <i class="bi bi-question-circle"></i></span><input type="text" id="max_rank" name="max_rank" value="{$max?rank}"/></div></div>
             </div>
             ,<div class="p-2 d-flex">
-                <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/aspro.xql">Get as an ASPRO2 file</button></div>
-                <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/outputfile.xql">Get as a SearchFTT list file</button></div>
+                <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/aspro.xql">Save my SearchFTT.asprox file</button></div>
+                <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/outputfile.xql">Save my SearchFTT.csv file</button></div>
                 <!-- <div class="p-2"><button class="btn btn-primary" type="submit" formaction="modules/test.xql">Test this list</button></div> -->
             </div>
             ,<p><i class="bi bi-info-circle-fill"></i>&#160;<kbd>Shift</kbd> click in the column order buttons to combine a multi column sorting.</p>
