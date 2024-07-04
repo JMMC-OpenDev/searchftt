@@ -8,7 +8,7 @@
   <author>Anthony Berdeu</author>
   <author>Jean-Philippe Berger</author>
   <website>https://searchftt.jmmc.fr</website>
-  <status>beta</status><!-- stable/beta/alpha -->
+  <status>stable</status><!-- stable/beta/alpha -->
   <license>AGPL-3.0</license>
   <copyright>true</copyright>
   <type>application</type>

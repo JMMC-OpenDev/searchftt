@@ -683,7 +683,7 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
     (
     <div>
 
-        <h2>Search Fringe Tracking Targets and Adaptative Optics stars for interferometry</h2>
+        <h2>Search Fringe Tracking Targets and Adaptative Optics stars</h2>
         <p><b>SearchFTT</b> searches for nearby stars of your Science Target(s) suitable for off-axis Fringe Tracking (FT) and off-axis Adaptive Optics (AO). <a class="btn btn-primary" data-bs-toggle="collapse" href="#collapseIntro" role="button" aria-expanded="false" aria-controls="collapseIntro">...</a>
         </p>
         <div class="collapse" id="collapseIntro">
@@ -694,8 +694,13 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
             <li>fill a VizieR table code with the option of try selecting names instead of coordinates.</li>
         </ul>
         <p>Each query is performed using SIMBAD or/and Gaia DR3 catalogues, which are cross-matched though CDS and ESA data centers. The search angular radius around each Science Target is compatible with a given maximal declination. A magnitude filter is applied to satisfy flux constraints for the near-infrared FT and for the visible AO. The query results following these constraints are presented in a main output table.</p><p>A “Score” is proposed for each pair (FT, AO) of candidates. The score is proportional to the Strehl ratio given by the AO correction, the proportionality coefficient depending on the expected fringe tracking performances given the FT candidate [<a href="#ref1">ref1</a>].
+        <br/><i class="bi-exclamation-circle"></i> the K-band magnitude listed for the FT targets is the total magnitude, which is equal to the correlated magnitude (the one that matter for fringe tracking performance) for non-resolved objects. In the case of partially or significantly resolved targets, the correlated K-band magnitude could be significantly higher than the total magnitude.  Therefore, for the considered VLTI array, the user should check the expected K-band correlated magnitudes of the FT target to insure that it can really be used for fringe tracking.
+
         <br/> In the Natural Guide Star mode (NGS), the Strehl ratio is estimated  from an analytical model of GPAO [<a href="#ref2">ref2</a>]. So, in this AO mode, a score ranking is possible.<br/>
-        Solutions can however be found in the AO Laser Guide Star mode (LGS) by reducing the AO magnitude to be entered but without a valid score provided, which prevents any score ranking.</p><p>If the Science Target follows the constraints on magnitude and can be itself the (FT, AO) candidates, this on-axis solution is also estimated and ranked.</p>
+        Solutions can however be found in the AO Laser Guide Star mode (LGS) by reducing the AO magnitude to be entered but without a valid score provided, which prevents any score ranking.</p>
+
+
+        <p>If the Science Target follows the constraints on magnitude and can be itself the (FT, AO) candidates, this on-axis solution is also estimated and ranked.</p>
         <p>You can save the query results by making an asprox-file, to see on Aspro2 the Science Targets with their FT and AO stars. Aspro2 will help the user to verify the feasibility of the observations in term of visibility level or correlated magnitude when using on-axis fringe tracking.</p>
         <p>You can also save the list of identifiers which have some candidates in a CSV file.</p>
 
@@ -708,6 +713,9 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
             This research has made use of the Jean-Marie Mariotti Center \texttt{{SearchFTT}} service.<br/>
             \footnote{{Available at <a href="https://searchftt.jmmc.fr" target="_blank" rel="noopener">https://searchftt.jmmc.fr</a>}}
             </code>
+        </p>
+        <p>
+        Please watch <a href="#">our 3' video for an overview of SearchFTT</a>.
         </p>
         </div>
 
