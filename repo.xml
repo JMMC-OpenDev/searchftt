@@ -16,6 +16,11 @@
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
   <changelog xmlns="">
+    <change version="1.5.30">
+      <ul>
+        <li>Add tutorial link.</li>
+      </ul>
+    </change>
     <change version="1.5.29">
       <ul>
         <li>Accept Copy and Paste onto the identifiers textfield ( linebreaks automatically are replaced by the ; separator ).</li>

@@ -715,7 +715,7 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
             </code>
         </p>
         <p>
-        Please watch <a href="#">our 3' video for an overview of SearchFTT</a>.
+        Please watch <a href="https://www.jmmc.fr/pub/tutos/SearchFTT.mov">our 3' video for an overview of SearchFTT</a>.
         </p>
         </div>
 
