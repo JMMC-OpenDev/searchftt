@@ -74,7 +74,7 @@ return
         string-join(
         for $param in request:get-parameter-names() order by $param
         return
-            for $v in request:get-parameter($param,()) return $param ||'='||encode-for-uri($v)
+            for $v in request:get-parameter($param,()) return $param ||'='||$v
             ,"&amp;")
     }
     </description>
@@ -102,7 +102,7 @@ return
             where $name=$all-identifiers
             let $target-id := app:genTargetIds($name)
             let $target := $targets[1]
-            order by $target/dec, $target/ra
+            order by number($target/dec), number($target/ra)
             return
                 <target id="{$target-id}">
                     <name>{$name}</name>
