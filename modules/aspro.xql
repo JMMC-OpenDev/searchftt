@@ -101,8 +101,9 @@ return
         for $targets in $targets-map?* group by $name := $targets/name/text()
             where $name=$all-identifiers
             let $target-id := app:genTargetIds($name)
+            let $target := $targets[1]
+            order by $target/dec, $target/ra
             return
-                let $target := $targets[1] return
                 <target id="{$target-id}">
                     <name>{$name}</name>
                     <RA>{data($target/ra)}</RA>
