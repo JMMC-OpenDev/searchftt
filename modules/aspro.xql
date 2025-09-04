@@ -1,8 +1,6 @@
 xquery version "3.1";
 
 import module namespace app="http://exist.jmmc.fr/searchftt/apps/searchftt/templates" at "app.xql";
-import module namespace config="http://exist.jmmc.fr/searchftt/apps/searchftt/config" at "config.xqm";
-
 
 
 (: Get config :)
@@ -73,7 +71,7 @@ return
     <name>SearchFTT generated</name>
     <description>
     {
-        string-join(("","    This file has been generated on "|| current-dateTime()||" by SearchFTT V"|| config:expath-descriptor()/@version ||" for : ",
+        string-join(("","    This file has been generated on "|| current-dateTime()||" by SearchFTT V"|| $app:conf?version ||" for : ",
         for $param in request:get-parameter-names() order by $param
         return
             for $v in request:get-parameter($param,()) return "      " || $param || "=" || $v
@@ -81,7 +79,7 @@ return
     }
     </description>
     <when>
-        <date>{replace(current-date(),"Z","")}</date>
+        <date>{$config?preferred?date_obs}</date>
         <nightRestriction>true</nightRestriction>
         <atmosphereQuality>Average</atmosphereQuality>
     </when>
