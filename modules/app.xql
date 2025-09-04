@@ -25,7 +25,6 @@ import module namespace astro="http://exist.jmmc.fr/searchftt/astro" at "astro.x
     - we could extend the default map (and rename it to config ? ) so we can store more than max values and associate for each of them more metadata : desc, displayorder...)
 
    FUTURE IDEAS/TODOS :
-    - present ft/ao tuples in the science table with a wait to keep only the best one so we can transmit them to Aspro2
     - add a constraint on tmass_dist so we avoid wrong GAIA Xmatches
     - show table overflow reaching max_result_table_rows !
     - add units in table
@@ -61,8 +60,10 @@ declare variable $app:json-conf :='{
         "min_score_doc" : "1= best performance, 0= worst performance",
 
         "preferred_bulk_catalog" : "Gaia DR3",
-        "max_rows_from_vizier" : 500
+        "max_rows_from_vizier" : 500,
+        "preferred_date_obs": "' || replace(current-date()+xs:yearMonthDuration("P6M"),"Z","") || '"
     },
+    "version" : "' || config:expath-descriptor()/@version|| '",
     "aspro-cols" : {"pmra":"PMRA", "pmdec":"PMDEC", "mag_v": "FLUX_V", "mag_r": "FLUX_R", "mag_g": "FLUX_G", "mag_ks": "FLUX_K"},
     "extended-cols" : [ "pmra", "pmdec", "pmde", "epoch", "cat_dist_as", "today_dist_as", "id", "str_source_id", "name" ],
     "samestar-dist_deg" : 2.78E-4,
@@ -221,10 +222,17 @@ declare function app:config() as map(*){
                                     default return $param
                             } catch * {$conf}
                         else $conf
-                    (: let $log := util:log("info", "conf ["|| $section ||"."|| $map-key || "]=" || $map-value) :)
+                    (: let $log := util:log("info", "conf ["|| $section ||"."|| $map-key || " / "|| $key ||"]=" || $map-value) :)
                     return ( map:entry($map-key, $map-value), map:entry($map-info-key, $map-info))
             ))
     )
+};
+
+declare function app:get-epoch-obs() {
+    let $d := xs:date(app:config()?preferred?date_obs)
+    let $y := year-from-date($d)
+    let $epoch := format-number( $y+( $d - xs:date($y||"-01-01")) div xs:dayTimeDuration("P365D"), "###.00")
+    return number($epoch)
 };
 
 declare %templates:wrap function app:dyn-nav-li($node as node(), $model as map(*), $identifiers as xs:string*) {
@@ -569,9 +577,10 @@ declare function app:search($id, $max, $s, $cat) {
                 <thead><tr>
                     {for $f at $cpos in $votable//*:FIELD return
                         if ($cpos != $source_id_idx) then
-                            let $title := if("cat_dist_as"=$f/@name) then "Distance computed moving science star to the catalog epoch using its proper motion"
-                                else if("j2000_dist_as"=$f/@name) then "Distance computed moving candidates to J2000"
-                                else if("today_dist_as"=$f/@name) then "Distance computed moving science star and candidates to current year epoch"
+                            (: do it before in votable ? :)
+                            let $title := if("cat_dist_as"=$f/@name) then "Computed distance of moving science star to the catalog epoch using its proper motion"
+                                else if("j2000_dist_as"=$f/@name) then "Computed distance of moving candidates to J2000"
+                                else if("jdateobs_dist_as"=$f/@name) then "Computed distance of moving science star and candidates to current year epoch"
                                 else $f/*:DESCRIPTION
                             let $name := if(starts-with($f/@name, "computed_")) then replace($f/@name, "computed_", "") else data($f/@name)
                             let $name :=  replace($name, "j_2mass", "2MASS&#160;J")
@@ -653,6 +662,12 @@ declare %templates:wrap function app:bulk-form($node as node(), $model as map(*)
 declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:string*, $viziertable as xs:string?) {
     let $start-time := util:system-time()
     let $config := app:config()
+    let $date-obs-param :=
+            <div class="p-2"><div class="input-group">
+                <span class="input-group-text">Date Obs.</span>
+                <input name="preferred_date_obs" value="{$config?preferred?date_obs}" class="form-control"/>
+            </div></div>
+
     let $max := $config("max")
     (: was here before max-mags to convey mags parameters
         let $params :=  for $p in request:get-parameter-names() where not ( $p=("identifiers", "catalogs") ) return <input type="hidden" name="{$p}" value="{request:get-parameter($p,' ')}"/> :)
@@ -722,7 +737,8 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
         <form method="post" action="bulk.html"> <!-- force action to avoid param duplication on post -->
             <div class="d-flex p-2">
             <div class="input-group">
-                <input title="You may drag and drop a multiline list in this field" type="text" class="form-control" placeholder="Enter your science identifiers or coordinates. Use semicolon as separator, e.g : 0 0 ; 4.321 -6.543 ; -00:11:22 +33:44:55.66 ; HD123 ; HD234 " aria-label="Science identifiers (semicolon separator)" id="identifiers" name="identifiers" value="{$identifiers}"/>
+                <input title="You may drag and drop a multiline list in this field" type="text" class="form-control" placeholder="Enter your science identifiers or J2000 coordinates. Use semicolon as separator, e.g : 0 0 ; 4.321 -6.543 ; -00:11:22 +33:44:55.66 ; HD123 ; HD234 " aria-label="Science identifiers (semicolon separator)" id="identifiers" name="identifiers" value="{$identifiers}"/>
+                {$date-obs-param}
             </div>
             </div>
             <div class="d-flex p-2"><div class="p-2 justify-content-end"><label class="form-check-label ">Catalogs to query:</label></div>
@@ -873,6 +889,7 @@ declare function app:searchftt-bulk-list-html($identifiers as xs:string*, $max a
         let $cat := $bulk-search-map?catalogs($cat)
         let $info := $cat?ranking
         let $error := ($cat?error,$info?error)
+        let $log-error := if($error) then util:log("error", $error) else ()
         where exists($error)
         return
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -1214,7 +1231,7 @@ declare function app:get-ranking($votable, $cat, $max) {
         (: let $log := util:log("info", serialize($res)) :)
 
         (: WebService ask for : [[sci_Kmag, ft_Kmag, sci_ft_dist, ao_Rmag, sci_ao_dist, ft_ao_dist]] :)
-        (: at_flag_ao at_flag_ft cat_dist_as_ao cat_dist_as_ft dec_ao dec_ft epoch_ao epoch_ft j2000_dist_as_ao j2000_dist_as_ft j2024_dist_as_ao j2024_dist_as_ft
+        (: at_flag_ao at_flag_ft cat_dist_as_ao cat_dist_as_ft dec_ao dec_ft epoch_ao epoch_ft j2000_dist_as_ao j2000_dist_as_ft jdateobs_dist_as_ao jdateobs_dist_as_ft
            mag_g_ao mag_g_ft mag_ks_ao mag_ks_ft mag_r_ao mag_r_ft
            mag_v_ao mag_v_ft otype_txt_ao otype_txt_ft pmdec_ao pmdec_ft pmra_ao pmra_ft ra_ao ra_ft science ft_ao_dist_as source_id_ao source_id_ft ut_flag_ao ut_flag_ft
         :)
@@ -1312,24 +1329,35 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         OR simplify distance computation if we do not have any pm info or same epoch ?
     :)
 
+    let $date-epoch := app:get-epoch-obs()
+    let $move_ra_J2000      := if ( $cat?epoch=2000.0 )      then () else <correction> - ( ({$cat?epoch}-2000.0) * {$cat?pmra} ) / 3600000.0</correction>
+    let $move_dec_J2000     := if ( $cat?epoch=2000.0 )      then () else <correction> - ( ( {$cat?epoch}-2000.0) * {$cat?pmdec} ) / 3600000.0</correction>
+    let $move_my_ra_cat     := if ( $cat?epoch=2000.0 )      then () else <correction> - ( (2000.0-{$cat?epoch}) * {$pmra} ) / 3600000.0</correction>
+    let $move_my_dec_cat    := if ( $cat?epoch=2000.0 )      then () else <correction> - ( (2000.0-{$cat?epoch}) * {$pmdec} ) / 3600000.0</correction>
+    let $move_ra_jdateobs     := if ( $cat?epoch=number($date-epoch) ) then () else <correction> - ( ({$cat?epoch}-{$date-epoch}) * {$cat?pmra} ) / 3600000.0</correction>
+    let $move_dec_jdateobs    := if ( $cat?epoch=$date-epoch ) then () else <correction> - ( ( {$cat?epoch}-{$date-epoch}) * {$cat?pmdec} ) / 3600000.0 </correction>
+    let $move_my_ra_jdateobs  := if ( 2000.0=$date-epoch )     then () else <correction> - ( (2000.0-{$date-epoch}) * {$pmra} ) / 3600000.0</correction>
+    let $move_my_dec_jdateobs := if ( 2000.0=$date-epoch )     then () else <correction> - ( (2000.0-{$date-epoch}) * {$pmdec} ) / 3600000.0</correction>
+
+
+
+    (: Compute distances moving catalog entries to J2000 :)
     let $distance_J2000 := <dist_as>DISTANCE(
-            POINT( 'ICRS', {$cat?ra} - ( ({$cat?epoch}-2000.0) * {$cat?pmra} ) / 3600000.0, {$cat?dec} - ( ( {$cat?epoch}-2000.0) * {$cat?pmdec} ) / 3600000.0  )
+            POINT( 'ICRS', {$cat?ra} { $move_ra_J2000 }, {$cat?dec} { $move_dec_J2000 } )
             ,POINT( 'ICRS', {$ra}, {$dec} )
         )*3600.0 as j2000_dist_as</dist_as>
 
+    (: Compute distances moving candidates to catalog's epoch :)
     let $distance_catalog := <dist_as>DISTANCE(
             POINT('ICRS', {$cat?ra}, {$cat?dec})
-            ,POINT('ICRS', {$ra}-((2000.0-{$cat?epoch})*{$pmra})/3600000.0, {$dec}-((2000.0-{$cat?epoch})*{$pmdec})/3600000.0 )
+            ,POINT('ICRS', {$ra}  { $move_my_ra_cat } , {$dec}  { $move_my_dec_cat })
         )*3600.0 as cat_dist_as</dist_as>
 
-    (:
-    could be more reliable but does not seem to change a lot
-    :)
-    let $date-epoch := 2024
+    (: Compute distances moving catalog entries and candidates to jdateobs obs epoch :)
     let $distance_jdate := <dist_as>DISTANCE(
-            POINT( 'ICRS', {$cat?ra} - ( ({$cat?epoch}-{$date-epoch}) * {$cat?pmra} ) / 3600000.0, {$cat?dec} - ( ( {$cat?epoch}-{$date-epoch}) * {$cat?pmdec} ) / 3600000.0  )
-            ,POINT('ICRS', {$ra}-((2000.0-{$date-epoch})*{$pmra})/3600000.0, {$dec}-((2000.0-{$date-epoch})*{$pmdec})/3600000.0 )
-        )*3600.0 as j2024_dist_as</dist_as>
+            POINT( 'ICRS', {$cat?ra} { $move_ra_jdateobs }, {$cat?dec} { $move_dec_jdateobs }  )
+            ,POINT('ICRS', {$ra} { $move_my_ra_jdateobs }, {$dec} { $move_my_dec_jdateobs } )
+        )*3600.0 as jdateobs_dist_as</dist_as>
     (: :)
 
     let $vmag := $cat?mag_v
