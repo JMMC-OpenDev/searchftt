@@ -48,7 +48,7 @@ declare variable $app:json-conf :='{
         "max_magR" : 12.5,
 
         "max_AO_mag": 12.5,
-        "max_AO_mag_doc": "use Gmag if present in catalogs else Rmag or Vmag",
+        "max_AO_mag_doc": "use GRPmag if present in catalogs or Gmag Rmag or Vmag",
         "max_FT_mag": 12,
 
         "max_dist_as" : 30,
@@ -136,7 +136,7 @@ declare variable $app:json-conf :='{
             "mag_g"  : "gaia.phot_g_mean_mag",
             "mag_bp" : "gaia.phot_bp_mean_mag",
             "mag_rp" : "gaia.phot_rp_mean_mag",
-            "detail"      : { "gaia.phot_rp_mean_mag": "Grp_mag", "tmass.h_m":"H_mag", "tmass_nb.angular_distance":"tmass_dist", "tmass.designation":"J_2MASS" },
+            "detail"      : { "tmass.h_m":"H_mag", "tmass_nb.angular_distance":"tmass_dist", "tmass.designation":"J_2MASS" },
             "from_very_slow"  :
                     "gaiadr3.gaia_source_lite as gaia JOIN gaiaedr3.tmass_psc_xsc_best_neighbour AS tmass_nb USING (source_id) JOIN gaiaedr3.tmass_psc_xsc_join AS xjoin ON tmass_nb.original_ext_source_id = xjoin.original_psc_source_id JOIN gaiadr1.tmass_original_valid AS tmass ON xjoin.original_psc_source_id = tmass.designation"
                 ,
@@ -1120,6 +1120,7 @@ declare function app:bulk-search($identifiers-map, $cat) {
             let $str_source_id_idx := index-of($field_names, "str_source_id")
             let $mag_k_idx := index-of($field_names, "mag_ks")
             let $mag_g_idx := index-of($field_names, "mag_g")
+            let $mag_rp_idx := index-of($field_names, "mag_rp")
             let $mag_v_idx := (index-of($field_names, "mag_v"),index-of($field_names, "computed_mag_v"))
             let $mag_r_idx := (index-of($field_names, "mag_r"),index-of($field_names, "computed_mag_r"))
             let $at_flag_idx := index-of($field_names, "at_flag")
@@ -1184,6 +1185,7 @@ declare function app:bulk-search($identifiers-map, $cat) {
                             let $ut_flag  :=  if ($magk<$max?magK_UT) then $magv_flag+1 else $magv_flag
 
                             let $magg := number($tr/*[$mag_g_idx])
+                            let $magrp := number($tr/*[$mag_rp_idx])
 
                             return <tr>
                                     {for $td at $pos in $tr/*:TD
@@ -1198,6 +1200,8 @@ declare function app:bulk-search($identifiers-map, $cat) {
                                                 (attribute {"class"} {if ($magr<$max?magR) then "table-success" else "table-danger"}, data($td))
                                             case $mag_g_idx return
                                                 (attribute {"class"} {if ($magg<$max?AO_mag) then "table-success" else "table-danger"}, data($td))
+                                            case $mag_rp_idx return
+                                                (attribute {"class"} {if ($magrp<$max?AO_mag) then "table-success" else "table-danger"}, data($td))
                                             case $at_flag_idx return
                                                 $at_flag
                                             case $ut_flag_idx return
@@ -1257,7 +1261,7 @@ declare function app:get-ranking($votable, $cat, $max) {
                         0,
                         number($tr/*:TD[$colidx("mag_ks_ft")]),
                         number($tr/*:TD[$colidx("cat_dist_as_ft")]),
-                        ( for $c in ("mag_g_ao","mag_r_ao","mag_v_ao") let $v := number($tr/*:TD[$colidx($c)]) where $v=$v return $v)[1],
+                        ( for $c in ("mag_rp_ao","mag_g_ao","mag_r_ao","mag_v_ao") let $v := number($tr/*:TD[$colidx($c)]) where $v=$v return $v)[1],
                         number($tr/*:TD[$colidx("cat_dist_as_ao")]),
                         number($tr/*:TD[$colidx("ft_ao_dist_as")])
                         )
@@ -1382,20 +1386,15 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     let $v_filter := if ($vmag) then $vmag else <text>( {$cat?mag_g } - ( -0.0176 - 0.00686* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1732*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
     let $r_filter := if ($rmag) then $rmag else <text>( {$cat?mag_g } - ( 0.003226 + 0.3833* ({$cat?mag_bp } - {$cat?mag_rp } ) - 0.1345*( {$cat?mag_bp } - {$cat?mag_rp })*( {$cat?mag_bp } - {$cat?mag_rp }) ) )</text>
     let $max-mag-filters := if($votname)
-        then <text>({$cat?mag_k }&lt;{$max?FT_mag} OR {$v_filter}&lt;{$max?AO_mag} OR {$r_filter}&lt;{$max?AO_mag} OR {$cat?mag_g}&lt;{$max?AO_mag})</text>
+        then <text>({$cat?mag_k }&lt;{$max?FT_mag} OR {$v_filter}&lt;{$max?AO_mag} OR {$r_filter}&lt;{$max?AO_mag} OR {$cat?mag_g}&lt;{$max?AO_mag} { if ($cat?mag_rp) then <rp_filter> OR {$cat?mag_rp}&lt;{$max?AO_mag}</rp_filter> else () } )</text>
         else <text>( ({$cat?mag_k }&lt;{$max?magK_UT} AND {$v_filter}&lt;{$max?magV}) OR ({$cat?mag_k }&lt;{$max?magK_AT} AND {$r_filter}&lt;{$max?magR}) )</text>
 
     (: escape catalogs with / inside  (VizieR case):)
     let $from := if($singlequery) then string-join($froms, "    JOIN    ") else $froms[1]
     let $from := if(contains($from, "/")) then '"'||$from||'"' else $from
 
-    (: compute science position in catalog epoch so we can compute crossmatch even if we do not have PM (inputs always have 0 for unknown PMs) :)
-    let $numerical_epoch := try{let $num := xs:double($cat?epoch) return true() }catch*{false()}
-    let $ra_in_cat := if($numerical_epoch) then <ra>{$ra}-((2000.0-{$cat?epoch})*{$pmra})/3600000.0</ra> else $ra
-    let $dec_in_cat := if($numerical_epoch) then <dec>{$dec}-((2000.0-{$cat?epoch})*{$pmdec})/3600000.0</dec> else $dec
-
     (:
-    no significant changes in the result / leved commented
+    no significant changes in the result / leaved as comment
     let $current-year :=  year-from-date(current-date())
     let $distance_today := <dist_as>DISTANCE(
         POINT( 'ICRS', {$cat?ra} - ( ({$cat?epoch}-{$current-year}) * {$cat?pmra} ) / 3600000.0, {$cat?dec} - ( ( {$cat?epoch}-{$current-year}) * {$cat?pmdec} ) / 3600000.0  ),
@@ -1408,6 +1407,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         ,<m>{$r_filter} as {$computed_prefix}mag_r</m>
         ,<m>{$cat?mag_k} as mag_ks</m>
         ,<m>{$cat?mag_g} as mag_g</m>[$cat?mag_g]
+        ,<m>{$cat?mag_rp} as mag_rp</m>[$cat?mag_rp]
         ,map:for-each( $cat?detail, function ($i, $j) { $i || ' AS ' ||$j})
         ), ",&#10;        ")
 
@@ -1417,7 +1417,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
 
     (: cross match must be done in the catalog epoch to retrieve candidates without PM :)
     (: /!\ VizieR will never end the processing if we do not put the input position in the POINT :)
-    let $positional-xmatch := <position>CONTAINS( POINT('ICRS', {$cat?ra}, {$cat?dec}), CIRCLE('ICRS', {$ra_in_cat}, {$dec_in_cat}, {$max?dist_as}/3600.0) ) = 1</position>
+    let $positional-xmatch := <position>CONTAINS( POINT('ICRS', {$cat?ra}, {$cat?dec}), CIRCLE('ICRS', {$ra} {$move_my_ra_cat}, {$dec} {$move_my_dec_cat}, {$max?dist_as}/3600.0) ) = 1</position>
     let $max_dec := <position>{$cat?dec} &lt; {$max?declination}</position>
     let $comments := string-join((""), "&#10;")
 
@@ -1442,7 +1442,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     FROM
         {$upload-from} {$from}
     WHERE
-        {string-join(($positional-xmatch,($max-mag-filters, $max_dec)[$singlequery]) ,"&#10;            AND&#10;          ")}
+        {string-join(($positional-xmatch,($max-mag-filters, $max_dec)[$singlequery]) ,"&#10;          AND&#10;        ")}
     ORDER BY
         {$order-by} j2000_dist_as
     </text>
@@ -1456,7 +1456,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         JOIN {$froms[1]} USING (source_id)
         JOIN {$froms[2]}
     WHERE
-        { string-join( ($max-mag-filters, $max_dec) ,"&#10;            AND&#10;          ") }
+        { string-join( ($max-mag-filters, $max_dec) ,"&#10;          AND&#10;        ") }
     </text>
 
     return
