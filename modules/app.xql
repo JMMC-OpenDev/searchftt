@@ -33,6 +33,7 @@ import module namespace astro="http://exist.jmmc.fr/searchftt/astro" at "astro.x
     - do chunk of long votables before quering TAP
     - support coord+pm when simbad does resolv it!
     - add objtypes while resolving simbad
+    - rename mag_{rp/bp} to mag_{grp/gbp}  or mag_g_{rp/bp}
 :)
 
 (: suffix used in maps to provide a text or html documentation :)
@@ -754,7 +755,16 @@ declare function app:bulk-form-html($identifiers as xs:string*, $catalogs as xs:
             {
                 if (exists($identifiers[string-length()>0])) then
                     (
-                        app:searchftt-bulk-list-html($identifiers, $max, $catalogs),
+                        try{
+                            let $test-ate-obs := app:get-epoch-obs()
+                            return
+                                app:searchftt-bulk-list-html($identifiers, $max, $catalogs)
+                        }catch * {
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                <div><b>Please check your date of observations:</b><br/> {$err:description}<br/> <pre>{$err:value}</pre> </div>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        },
                         <code class="extdebug d-none"><br/>Request processing duration : {seconds-from-duration(util:system-time()-$start-time)}s</code>
                     )
                 else ()
@@ -1143,7 +1153,7 @@ declare function app:bulk-search($identifiers-map, $cat) {
                     </h3>
                     <ul>
                     <li> {$input-targets-count} targets queried </li>
-                    <li> {$count-ftao} targets with both FT and AO solutions </li>
+                    <li> {$count-ftao} targets with both FT and AO solutions (jdateobs_dist computed on epoch {app:get-epoch-obs()}) </li>
                     <li> TBD_C targets with FT only </li>
                     <li> TBD_D targets with AO only </li>
                     <li> {$count-no-ftao} targets with no candidate </li>
@@ -1234,6 +1244,8 @@ declare function app:get-ranking($votable, $cat, $max) {
         (: at_flag_ao at_flag_ft cat_dist_as_ao cat_dist_as_ft dec_ao dec_ft epoch_ao epoch_ft j2000_dist_as_ao j2000_dist_as_ft jdateobs_dist_as_ao jdateobs_dist_as_ft
            mag_g_ao mag_g_ft mag_ks_ao mag_ks_ft mag_r_ao mag_r_ft
            mag_v_ao mag_v_ft otype_txt_ao otype_txt_ft pmdec_ao pmdec_ft pmra_ao pmra_ft ra_ao ra_ft science ft_ao_dist_as source_id_ao source_id_ft ut_flag_ao ut_flag_ft
+
+            grp_mag_ao grp_mag_ft h_mag_ao h_mag_ft  j_2mass_ao j_2mass_ft
         :)
         let $input-params := ("ft_mag","sci_ft_dist","ao_mag","sci_ao_dist","ft_ao_dist")
 
@@ -1270,6 +1282,9 @@ declare function app:get-ranking($votable, $cat, $max) {
             map{"res":$res, "cat":$cat?cat_name, "error":$error, "query": $internal-match-query, "sciences-idx" : $map-by-sci , "ftaos": $ftaos ,"scores": $scores, "inputs":$inputs, "input-params":$input-params}
 };
 
+(:
+    Combine every candidates as ft or ao with associated and distance constraints.
+:)
 declare function app:build_internal_query($votable, $table-name, $cat, $max){
     (: iterate on every columns except science and add a new distance :)
     let $colnames := for $f in $votable//*:FIELD/@name return lower-case($f)
@@ -1330,14 +1345,14 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
     :)
 
     let $date-epoch := app:get-epoch-obs()
-    let $move_ra_J2000      := if ( $cat?epoch=2000.0 )      then () else <correction> - ( ({$cat?epoch}-2000.0) * {$cat?pmra} ) / 3600000.0</correction>
-    let $move_dec_J2000     := if ( $cat?epoch=2000.0 )      then () else <correction> - ( ( {$cat?epoch}-2000.0) * {$cat?pmdec} ) / 3600000.0</correction>
-    let $move_my_ra_cat     := if ( $cat?epoch=2000.0 )      then () else <correction> - ( (2000.0-{$cat?epoch}) * {$pmra} ) / 3600000.0</correction>
-    let $move_my_dec_cat    := if ( $cat?epoch=2000.0 )      then () else <correction> - ( (2000.0-{$cat?epoch}) * {$pmdec} ) / 3600000.0</correction>
-    let $move_ra_jdateobs     := if ( $cat?epoch=number($date-epoch) ) then () else <correction> - ( ({$cat?epoch}-{$date-epoch}) * {$cat?pmra} ) / 3600000.0</correction>
-    let $move_dec_jdateobs    := if ( $cat?epoch=$date-epoch ) then () else <correction> - ( ( {$cat?epoch}-{$date-epoch}) * {$cat?pmdec} ) / 3600000.0 </correction>
-    let $move_my_ra_jdateobs  := if ( 2000.0=$date-epoch )     then () else <correction> - ( (2000.0-{$date-epoch}) * {$pmra} ) / 3600000.0</correction>
-    let $move_my_dec_jdateobs := if ( 2000.0=$date-epoch )     then () else <correction> - ( (2000.0-{$date-epoch}) * {$pmdec} ) / 3600000.0</correction>
+    let $move_ra_J2000      := if ( $cat?epoch=2000.0 )      then () else <correction> - ( ({$cat?epoch} - 2000.0) * {$cat?pmra} ) / 3600000.0</correction>
+    let $move_dec_J2000     := if ( $cat?epoch=2000.0 )      then () else <correction> - ( ( {$cat?epoch} - 2000.0) * {$cat?pmdec} ) / 3600000.0</correction>
+    let $move_my_ra_cat     := if ( $cat?epoch=2000.0 )      then () else <correction> - ( (2000.0 - {$cat?epoch}) * {$pmra} ) / 3600000.0</correction>
+    let $move_my_dec_cat    := if ( $cat?epoch=2000.0 )      then () else <correction> - ( (2000.0 - {$cat?epoch}) * {$pmdec} ) / 3600000.0</correction>
+    let $move_ra_jdateobs     := if ( $cat?epoch=number($date-epoch) ) then () else <correction> - ( ({$cat?epoch} - {$date-epoch}) * {$cat?pmra} ) / 3600000.0</correction>
+    let $move_dec_jdateobs    := if ( $cat?epoch=$date-epoch ) then () else <correction> - ( ( {$cat?epoch} - {$date-epoch}) * {$cat?pmdec} ) / 3600000.0 </correction>
+    let $move_my_ra_jdateobs  := if ( 2000.0=$date-epoch )     then () else <correction> - ( (2000.0 - {$date-epoch}) * {$pmra} ) / 3600000.0</correction>
+    let $move_my_dec_jdateobs := if ( 2000.0=$date-epoch )     then () else <correction> - ( (2000.0 - {$date-epoch}) * {$pmdec} ) / 3600000.0</correction>
 
 
 
