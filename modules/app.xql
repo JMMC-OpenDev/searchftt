@@ -1293,6 +1293,8 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
     (: iterate on every columns except science and add a new distance :)
     let $colnames := for $f in $votable//*:FIELD/@name return lower-case($f)
 
+    let $date-epoch := app:get-epoch-obs()
+
     let $vmag := $cat?mag_v
     let $rmag := $cat?mag_r
     let $computed_prefix := if($vmag and $rmag ) then () else "computed_"
@@ -1300,6 +1302,10 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
     let $ao-filters := <text>( { <text>ao.mag_rp&lt;{$max?AO_mag} OR </text>[$cat?mag_rp]} ao.mag_g&lt;{$max?AO_mag} OR ao.{$computed_prefix}mag_r&lt;{$max?AO_mag} OR ao.{$computed_prefix}mag_v&lt;{$max?AO_mag} )</text>
 
     let $ftao-dist := <text>DISTANCE( POINT( 'ICRS', ft.ra, ft.dec),POINT('ICRS', ao.ra, ao.dec))*3600.0</text>
+    let $ftao-dist-jdateobs := <text>DISTANCE(
+          POINT('ICRS', ft.ra - ( ({$cat?epoch} - {$date-epoch}) * ft.pmra ) / 3600000.0, ft.dec - ( ( {$cat?epoch} - {$date-epoch}) * ft.pmdec ) / 3600000.0)
+        , POINT('ICRS', ao.ra - ( ({$cat?epoch} - {$date-epoch}) * ao.pmra ) / 3600000.0, ao.dec - ( ( {$cat?epoch} - {$date-epoch}) * ao.pmdec ) / 3600000.0)
+        )*3600.0</text>
     let $dist-filter := <text>(({$ftao-dist}) &lt; {2 * $max?dist_as})</text>
     let $same-science-filter := <text>(ft.science = ao.science)</text>
 
@@ -1308,6 +1314,7 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
         "  "||string-join(
             ("ft.science as science",
             $ftao-dist || " as ft_ao_dist_as",
+            $ftao-dist-jdateobs || " as ft_ao_jdateobs_dist_as",
             for $c in $colnames[not(.="science")] return
                 for $type in ("ft", "ao")
                     return string-join( (($type, ".", $c), " as ", $c, "_"[exists($c)], $type) )
@@ -1436,7 +1443,7 @@ declare function app:build-query($identifier, $votable, $max, $cat as map(*)){
         0 as ut_flag,
         0 as at_flag,
         {$cat?ra} as ra, {$cat?dec} as dec,
-        {$cat?pmra}, {$cat?pmdec},
+        {$cat?pmra} as pmra, {$cat?pmdec} as pmdec,
         {$cat?epoch} as epoch{","[$singlequery]}
         {$mags[$singlequery]}
     FROM
