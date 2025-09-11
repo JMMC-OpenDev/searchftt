@@ -15,7 +15,7 @@ let $res := app:searchftt-bulk-list($identifiers, $catalogs)
 
 (: gather results :)
 let $sciences-idx := $res?catalogs?*?ranking?sciences-idx
-let $sciences := distinct-values(for $m in $sciences-idx return map:keys($m))
+let $sciences := sort(distinct-values(for $m in $sciences-idx return map:keys($m)))
 (: let $log := util:log("info", "sciences : " || string-join($sciences)) :)
 
 (: rebuil association using resolved(or not) name instead of str_source_ids:)
@@ -52,8 +52,11 @@ let $targetInfos := map:merge((
             map:entry($science, map{ "ft-ids": $science-fts, "ao-ids": $science-aos})
     ))
 
-let $fts-ids := $targetInfos?*?ft-ids
-let $aos-ids := $targetInfos?*?ao-ids
+let $log := util:log("info", $targetInfos)
+
+
+let $fts-ids := sort(distinct-values($targetInfos?*?ft-ids))
+let $aos-ids := sort(distinct-values($targetInfos?*?ao-ids))
 
 (: prepare maps for Aspro2 sources description :)
 let $all-identifiers := distinct-values( ( map:keys($targetInfos), $fts-ids, $aos-ids) )
@@ -163,8 +166,8 @@ return
         </groupMembers>
         {
             map:for-each($targetInfos, function ($science,$science-map){
-                let $science-fts:=$science-map?ft-ids[not(.=$science)]
-                let $science-aos:=$science-map?ao-ids[not(.=$science)]
+                let $science-fts:=sort(distinct-values($science-map?ft-ids[not(.=$science)]))
+                let $science-aos:=sort(distinct-values($science-map?ao-ids[not(.=$science)]))
                 return
                     <targetInfo>
                         <targetRef>{app:genTargetIds($science)}</targetRef>
