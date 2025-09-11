@@ -19,3 +19,4 @@ do
 done
 
 mv -v outs outs.$(date -Is)
+ln -s outs.$(date -Is) outs.latest

@@ -2,7 +2,7 @@
     <schemaVersion>2018.04</schemaVersion><!--Remove to propose coordinates refresh (may be part of a form parameter to add it) <targetVersion>2019.09</targetVersion>-->
     <name>SearchFTT generated</name>
     <description>
-    This file has been generated on 2025-09-04T13:18:18.98Z by SearchFTT V1.5.31 for : 
+    This file has been generated on 2025-09-11T13:33:01.282Z by SearchFTT V1.6.1 for : 
       catalogs=Simbad
       catalogs=Gaia DR3
       identifiers=83.82190603333 -5.387936316139999; tet01 Ori D; tet01 Ori C; tet01 Ori B; NAME Sgr A*;HD224803;aLeX iS A;eta tau;Sirius; HD2345;coup 1; coup 2
@@ -12,7 +12,7 @@
       max_rank=20
       min_score=0</description>
     <when>
-        <date>2026-03-04</date>
+        <date>2026-03-11</date>
         <nightRestriction>true</nightRestriction>
         <atmosphereQuality>Average</atmosphereQuality>
     </when><!--<interferometerConfiguration>
@@ -372,7 +372,7 @@
         </group>
         <groupMembers>
             <groupRef>JMMC_AO</groupRef>
-            <targets>__tet01_Ori_B __tet01_Ori_C __tet01_Ori_D __tet01_Ori_F HIP_70 Gaia_DR3_66714384142368256 __tet01_Ori_A __tet01_Ori_B __tet01_Ori_D __tet01_Ori_E __tet01_Ori_F __tet01_Ori_A __tet01_Ori_E __alf_CMa_B __tet01_Ori_B __tet01_Ori_C __tet01_Ori_F Brun_283</targets>
+            <targets>__tet01_Ori_B __tet01_Ori_C __tet01_Ori_D __tet01_Ori_F HIP_70 Gaia_DR3_66714384142368256 __tet01_Ori_A __tet01_Ori_B __tet01_Ori_D __tet01_Ori_E __tet01_Ori_F V__V348_Ori __tet01_Ori_A __tet01_Ori_E __alf_CMa_B __tet01_Ori_B __tet01_Ori_C __tet01_Ori_F Brun_283</targets>
         </groupMembers>
         <groupMembers>
             <groupRef>JMMC_FT</groupRef>
@@ -448,7 +448,7 @@
             <targetRef>__tet01_Ori_B</targetRef>
             <groupMembers>
                 <groupRef>JMMC_AO</groupRef>
-                <targets>__tet01_Ori_A __tet01_Ori_E</targets>
+                <targets>V__V348_Ori __tet01_Ori_A __tet01_Ori_E</targets>
             </groupMembers>
             <groupMembers>
                 <groupRef>JMMC_FT</groupRef>
