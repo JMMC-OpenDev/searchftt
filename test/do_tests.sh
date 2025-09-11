@@ -19,4 +19,5 @@ do
 done
 
 mv -v outs outs.$(date -Is)
+rm -rf outs.latest
 ln -s outs.$(date -Is) outs.latest
