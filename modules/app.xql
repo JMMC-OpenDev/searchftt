@@ -1297,7 +1297,7 @@ declare function app:build_internal_query($votable, $table-name, $cat, $max){
     let $rmag := $cat?mag_r
     let $computed_prefix := if($vmag and $rmag ) then () else "computed_"
     let $ft-filters := <text>(ft.mag_ks &lt; {$max?FT_mag})</text>
-    let $ao-filters := <text>( ao.mag_g&lt;{$max?AO_mag} OR ao.{$computed_prefix}mag_r&lt;{$max?AO_mag} OR ao.{$computed_prefix}mag_v&lt;{$max?AO_mag} )</text>
+    let $ao-filters := <text>( { <text>ao.mag_rp&lt;{$max?AO_mag} OR </text>[$cat?mag_rp]} ao.mag_g&lt;{$max?AO_mag} OR ao.{$computed_prefix}mag_r&lt;{$max?AO_mag} OR ao.{$computed_prefix}mag_v&lt;{$max?AO_mag} )</text>
 
     let $ftao-dist := <text>DISTANCE( POINT( 'ICRS', ft.ra, ft.dec),POINT('ICRS', ao.ra, ao.dec))*3600.0</text>
     let $dist-filter := <text>(({$ftao-dist}) &lt; {2 * $max?dist_as})</text>
