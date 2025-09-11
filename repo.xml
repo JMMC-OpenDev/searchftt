@@ -16,11 +16,17 @@
   <prepare>pre-install.xql</prepare>
   <finish>post-install.xql</finish>
   <changelog xmlns="">
-    <change version="1.6.0">
+    <!-- TODO
+    <li>Better export of Gmag in Aspro2 files.</li>
+    -->
+
+    <change version="1.6.1">
       <ul>
+        <!-- change version="1.6.0" -->
         <li>Try to use GRP if present to compute ranking else try G, R or V mag.</li>
         <li>Form accepts a new date-obs field to compute exact distance ( queries have been optimized to save some calculations ). Next version will use the jdateobs epoch instead of the catalog's one.</li>
-        <li>Targets are sorted by coords in Asprox file exports (helps comparisons during tests).</li>
+        <li>Targets are sorted by coords and not duplicated anymore in Asprox file exports (helps comparisons during tests).</li>
+        <li>Fix some UT/AT feasibility info flags.</li>
       </ul>
     </change>
     <change version="1.5.30">
