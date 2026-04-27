@@ -6,9 +6,16 @@ import module namespace jmmc-tap="http://exist.jmmc.fr/jmmc-resources/tap" at "/
 
 (: TODO move next local function into jmmc:vizier module :)
 
+(: Add one leading and trailing quot on each given id.
+ : TAP1.1 asks explicitly to include quotes in certains cases and this is what tapvizier do. after SearchFTT V1.6.1
+ :)
+declare function local:normalize-table-names($vizierTableIds as xs:string*){
+  $vizierTableIds!concat("&quot;",normalize-space(.),"&quot;")
+};
+
 (: Search for 20th vizier tables names starting with a given prefix (eg. catalog ID ):)
 declare function local:getTables($vizierTablePrefix as xs:string){
-let $vizierTablePrefix := normalize-space($vizierTablePrefix)
+let $vizierTablePrefix := local:normalize-table-names($vizierTablePrefix)
 let $query := "
 SELECT
   *
@@ -35,7 +42,7 @@ return
  :  or a map{$cat:($ra,$dec) for multiple table names.
  :)
 declare function local:getNameOrCoordColnames($vizierTableIds as xs:string*){
-let $in := string-join($vizierTableIds!concat("'",normalize-space(.),"'"),",")
+let $in := string-join($vizierTableIds!concat("'",local:normalize-table-names(.),"'"),",")
 
 
 (: constraints for column on interrest. Lists can be provided ( with decreasing priority order ) :)
@@ -95,18 +102,19 @@ declare function local:filter($col, $trs, $constraints, $colidx){
 
 declare function local:getNamesOrCoords($tableId as xs:string)
 {
-    let $tableId := normalize-space($tableId)
+
     let $colinfo := local:getNameOrCoordColnames($tableId)
+    let $tableId := local:normalize-table-names($tableId)
     (: let $log := util:log("info", "Searching idorcoord cols in '"|| $tableId ||"' with '"||serialize($colinfo,map {"method": "adaptive"})||"'") :)
 
 
     let $try-name-first := exists(request:get-parameter("try-name-first",()))
     let $query := if ( $try-name-first and exists($colinfo?name)) then
-          <query>SELECT {$colinfo?name} FROM &quot;{$tableId}&quot;</query>
+          <query>SELECT {$colinfo?name} FROM {$tableId}</query>
           else if (exists($colinfo?ra) and exists($colinfo?dec))  then
-          <query>SELECT {$colinfo?ra}, {$colinfo?dec} FROM &quot;{$tableId}&quot;</query>
+          <query>SELECT {$colinfo?ra}, {$colinfo?dec} FROM {$tableId}</query>
           else if ( exists($colinfo?name)) then
-          <query>SELECT {$colinfo?name} FROM &quot;{$tableId}&quot;</query>
+          <query>SELECT {$colinfo?name} FROM {$tableId}</query>
         else ()
 
     return

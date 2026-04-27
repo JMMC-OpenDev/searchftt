@@ -19,7 +19,11 @@
     <!-- TODO
     <li>Better export of Gmag in Aspro2 files.</li>
     -->
-
+    <change version="1.6.2">
+      <ul>
+        <li>Fix searches on VizieR tables (it's TAP1.1 now includes quotes in table names looking to the TAP_SCHEMA).</li>
+      </ul>
+    </change>
     <change version="1.6.1">
       <ul>
         <!-- change version="1.6.0" -->
